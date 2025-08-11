@@ -1,0 +1,174 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-wheel-metadata/
+share/python-wheels/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# pyenv
+.python-version
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# uv
+.uv/
+uv.lock
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# FastMCP / MCP specific
+.mcp/
+mcp-*.log
+
+# Inkognito specific
+# Temporary extraction outputs
+temp/
+tmp/
+*.tmp
+
+# Anonymized output directories (contain sensitive data)
+output/
+anonymized/
+restored/
+segments/
+prompts/
+
+# Vault files (contain PII mappings)
+vault.json
+*.vault.json
+vault_*.json
+
+# Extracted documents
+*.extracted.md
+
+# Test documents
+test_docs/
+test_data/
+sample_docs/
+
+# API keys and secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# Logs
+logs/
+*.log
+
+# Cache directories
+.cache/
+__pycache__/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*~
+*.orig
+
+# Compiled documentation
+docs/_build/
+docs/.doctrees/
+
+# Package lock files (we use uv)
+package-lock.json
+yarn.lock
+poetry.lock
+
+# Debug files
+*.pdb
+
+# Profiling data
+*.prof
+*.lprof
+
+# Crash logs
+crash.log
+crash.*.log
