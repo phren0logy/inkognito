@@ -2,6 +2,8 @@
 
 Privacy-first document processing FastMCP server. Extract, anonymize, and segment documents through FastMCP's modern tool interface.
 
+Please note: As an MCP, privacy of file contents cannot be absolutely guaranteed, but it is a central design consideration. While file _contents_ should be low risk (but non-zero) risk for leakage, file _names_ will unavoidably be read and written by the MCP. Plan accordingly.
+
 ## Quick Start
 
 ### Installation
@@ -32,6 +34,20 @@ Add to your `claude_desktop_config.json`:
         "LLAMAPARSE_API_KEY": "your-key-here"
       }
     }
+    // If not already present, you need to make sure you add a filesystem MCP
+    // Setting up the default Claude Desktop MCP with Docker allows you to set your
+    // input folder as "read-only" so you don't alter the contents
+    // Note that "dst" is "destination," which is the path Claude will see
+    "filesystem": {
+    "command": "docker",
+    "args": [
+      "run", "-i", "--rm",
+      "--mount", "type=bind,src=/Users/you/Documents/PDFs,dst=/projects/pdfs,ro",  //read only for protection
+      "--mount", "type=bind,src=/Users/you/Documents/ProcessedDocs,dst=/projects/output",
+      "mcp/filesystem",
+      "/projects"
+      ]
+    },
   }
 }
 ```

@@ -1,4 +1,3 @@
-# Inkognito FastMCP Server Implementation Plan
 
 ## Overview
 

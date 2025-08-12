@@ -54,6 +54,12 @@ class PIIAnonymizer:
         """
         Anonymize text with consistent replacements.
         
+        This method is designed to support future multi-recognizer pipelines.
+        Currently uses a single scanner, but the architecture allows for:
+        - Multiple detection passes with different recognizers
+        - Duplicate entity resolution before faker replacement
+        - Custom entity processors for specific use cases
+        
         Args:
             text: Text to anonymize
             existing_mappings: Previous mappings for consistency
@@ -61,28 +67,47 @@ class PIIAnonymizer:
         Returns:
             Tuple of (anonymized_text, statistics, new_mappings)
         """
-        scanner = self.create_scanner()
-        vault = Vault()
+        # Initialize mappings
+        if existing_mappings is None:
+            existing_mappings = {}
         
-        # First pass: detect PII with placeholders
+        # PHASE 1: Detection
+        # Future: This could be a loop over multiple scanner configurations
+        vault = Vault()
+        scanner = self.create_scanner()
+        
+        # Run detection pass - scanner populates vault with found entities
         sanitized_prompt, is_valid, risk_score = scanner.scan(vault, text)
         
         if not is_valid:
             logger.info(f"PII detected with risk score: {risk_score}")
+        
+        # PHASE 2: Entity Processing (future extension point)
+        # Future: Add duplicate resolution here (e.g., "Jane Smith" vs "Ms. Smith")
+        # Future: Add entity validation or filtering
+        
+        # PHASE 3: Replacement
+        # Get all vault entries using the proper API
+        vault_entries = vault.get()  # Returns list of (placeholder, original) tuples
+        
+        # Group entities by type for statistics
+        entities_by_type = {}
+        for placeholder, original_value in vault_entries:
+            # Extract entity type from placeholder format [REDACTED_TYPE_NUM]
+            entity_type = self._extract_entity_type(placeholder)
+            if entity_type not in entities_by_type:
+                entities_by_type[entity_type] = []
+            entities_by_type[entity_type].append((placeholder, original_value))
         
         # Apply consistent replacements
         anonymized_text = sanitized_prompt
         statistics = {}
         new_mappings = {}
         
-        if existing_mappings is None:
-            existing_mappings = {}
-        
-        # Process vault entries for consistent replacement
-        for entity_type, values in vault._vault.items():
-            statistics[entity_type] = len(values)
+        for entity_type, entities in entities_by_type.items():
+            statistics[entity_type] = len(entities)
             
-            for original_value in values:
+            for placeholder, original_value in entities:
                 # Check if we already have a mapping
                 if original_value in existing_mappings:
                     faker_value = existing_mappings[original_value]
@@ -92,11 +117,25 @@ class PIIAnonymizer:
                     new_mappings[original_value] = faker_value
                 
                 # Replace placeholder with faker value
-                placeholder = f"[REDACTED_{entity_type.upper()}]"
-                if placeholder in anonymized_text:
-                    anonymized_text = anonymized_text.replace(placeholder, faker_value, 1)
+                anonymized_text = anonymized_text.replace(placeholder, faker_value, 1)
         
         return anonymized_text, statistics, new_mappings
+    
+    def _extract_entity_type(self, placeholder: str) -> str:
+        """Extract entity type from placeholder format.
+        
+        Placeholders follow format: [REDACTED_ENTITY_TYPE_NUM]
+        e.g., [REDACTED_PERSON_1] -> PERSON
+        """
+        # Remove [REDACTED_ prefix and ] suffix
+        if placeholder.startswith("[REDACTED_") and placeholder.endswith("]"):
+            content = placeholder[10:-1]  # Remove "[REDACTED_" and "]"
+            # Split by underscore and remove the number at the end
+            parts = content.rsplit("_", 1)
+            if len(parts) > 1 and parts[1].isdigit():
+                return parts[0]
+            return content
+        return "UNKNOWN"
     
     def _generate_faker_value(self, entity_type: str, original_value: str) -> str:
         """Generate appropriate faker value based on entity type."""

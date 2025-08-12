@@ -2,6 +2,4 @@
 
 __version__ = "0.1.0"
 
-from server import server
-
-__all__ = ["server", "__version__"]
+__all__ = ["__version__"]
