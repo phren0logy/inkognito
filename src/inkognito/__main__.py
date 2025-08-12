@@ -1,6 +1,5 @@
 """Entry point for Inkognito FastMCP server."""
 
-import asyncio
 import sys
 import logging
 from .server import server
@@ -13,7 +12,7 @@ def main():
     )
     
     try:
-        asyncio.run(server.run())
+        server.run()
     except KeyboardInterrupt:
         print("\nShutting down Inkognito FastMCP server...")
         sys.exit(0)

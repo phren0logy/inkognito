@@ -23,12 +23,6 @@ logger = logging.getLogger(__name__)
 # Initialize FastMCP server
 server = FastMCP("inkognito")
 
-# Add metadata
-server.meta(
-    description="Privacy-preserving document processing",
-    version="0.1.0"
-)
-
 
 @dataclass
 class ProcessingResult:
@@ -831,3 +825,8 @@ Generated: {datetime.now().isoformat()}
             statistics={},
             message=f"Prompt generation failed: {str(e)}"
         )
+
+
+# Main entry point
+if __name__ == "__main__":
+    server.run()

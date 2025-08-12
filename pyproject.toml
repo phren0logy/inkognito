@@ -1,7 +1,7 @@
 [project]
 name = "inkognito"
 version = "0.1.0"
-requires-python = ">=3.9"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "fastmcp>=2.11.0",
     "llm-guard>=0.3.0",
@@ -9,6 +9,7 @@ dependencies = [
     "tiktoken>=0.5.0",
     "aiofiles>=23.0.0",
     "python-magic>=0.4.0",
+    "pip>=25.2",
 ]
 
 [project.optional-dependencies]
