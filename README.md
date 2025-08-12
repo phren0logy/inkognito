@@ -22,9 +22,6 @@ fastmcp run inkognito
 ### Configure Claude Desktop
 
 If not already present, you need to make sure you add a filesystem MCP.
-Setting up the default Claude Desktop MCP with Docker allows you to set your input folder as "read-only" so you don't alter the contents, but adding the ",ro" shown below.
-
-Note that "dst" is "destination," which is the path Claude will see in the chat.
 
 Add to your `claude_desktop_config.json`:
 
@@ -40,14 +37,21 @@ Add to your `claude_desktop_config.json`:
       }
     }
     "filesystem": {
-    "command": "docker",
-    "args": [
-      "run", "-i", "--rm",
-      "--mount", "type=bind,src=/Users/you/Documents/PDFs,dst=/projects/pdfs,ro",
-      "--mount", "type=bind,src=/Users/you/Documents/ProcessedDocs,dst=/projects/output",
-      "mcp/filesystem",
-      "/projects"
-      ]
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/you/input-files-or-whatever",
+        "/Users/you/output-folder-if-you-want-one"
+      ],
+      "env": {},
+      "transport": "stdio",
+      "type": null,
+      "cwd": null,
+      "timeout": null,
+      "description": null,
+      "icon": null,
+      "authentication": null
     },
   }
 }

@@ -71,15 +71,35 @@ async def my_tool(file_path: str, ctx: Context) -> ProcessingResult:
     # ... tool logic
 ```
 
-## Development Commands
+## Running the FastMCP Server
 
+### Installation
+
+For development, install the package in editable mode:
 ```bash
-# Run the FastMCP server (from project root)
-uv run inkognito.server
-
-# Test with FastMCP CLI (preferred)
-fastmcp run inkognito
+uv pip install -e .
 ```
+
+### Starting the Server
+
+Following FastMCP best practices, use one of these methods:
+
+1. **FastMCP CLI (recommended)**:
+   ```bash
+   uv run fastmcp run server.py
+   ```
+
+2. **Direct Python execution**:
+   ```bash
+   uv run python server.py
+   ```
+
+3. **With FastMCP dev mode** (includes MCP Inspector):
+   ```bash
+   uv run fastmcp dev server.py
+   ```
+
+Note: The `[project.scripts]` entry point has been removed to follow FastMCP best practices. FastMCP servers should be run using the `fastmcp` CLI tool rather than custom console scripts.
 
 ## Important Design Decisions
 

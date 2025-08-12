@@ -10,8 +10,12 @@ try:
     from llm_guard.input_scanners import Anonymize
     from llm_guard.input_scanners.anonymize_helpers import DISTILBERT_AI4PRIVACY_v2_CONF
     from llm_guard.vault import Vault
+    LLM_GUARD_AVAILABLE = True
 except ImportError:
-    raise ImportError("llm-guard is required. Install with: pip install llm-guard")
+    LLM_GUARD_AVAILABLE = False
+    Anonymize = None
+    DISTILBERT_AI4PRIVACY_v2_CONF = None
+    Vault = None
 
 logger = logging.getLogger(__name__)
 
@@ -28,23 +32,37 @@ class PIIAnonymizer:
         "US_BANK_NUMBER", "CRYPTO", "MEDICAL_LICENSE"
     ]
     
-    def __init__(self):
-        """Initialize anonymizer with faker and default settings."""
+    def __init__(self, entity_types: Optional[List[str]] = None):
+        """Initialize anonymizer with faker and default settings.
+        
+        Args:
+            entity_types: List of entity types to detect. If None, uses defaults.
+        """
+        if not LLM_GUARD_AVAILABLE:
+            raise ImportError(
+                "llm-guard is required for PII anonymization. "
+                "Install with: uv add 'llm-guard>=0.3.0'"
+            )
+        
+        self.entity_types = entity_types or self.DEFAULT_ENTITY_TYPES
         self.faker = Faker()
         Faker.seed(random.randint(0, 10000))  # Random seed for each session
         self.date_shift_days = 365  # Default date shifting range
     
-    def create_scanner(self) -> Anonymize:
-        """Create LLM-Guard scanner instance with universal defaults."""
-        return Anonymize(
-            model_config=DISTILBERT_AI4PRIVACY_v2_CONF,
-            entity_types=self.DEFAULT_ENTITY_TYPES,
-            score_threshold=0.5,
-            preamble="",
-            use_faker=False,  # We handle faker replacements ourselves for consistency
-            recognizer_config={"low_confidence_score_threshold": 0.3},
-            hide_pii=True
+    def _create_scanner(self) -> Tuple[Anonymize, Vault]:
+        """Create a new LLM-Guard scanner instance with a fresh vault."""
+        # Always create a new vault for each scan to avoid cross-contamination
+        vault = Vault()
+        
+        # Create scanner with new API
+        scanner = Anonymize(
+            vault=vault,
+            entity_types=self.entity_types,
+            threshold=0.5,
+            use_faker=False,  # We handle faker replacements ourselves
+            recognizer_conf=DISTILBERT_AI4PRIVACY_v2_CONF
         )
+        return scanner, vault
     
     def anonymize_with_vault(
         self,
@@ -53,12 +71,6 @@ class PIIAnonymizer:
     ) -> Tuple[str, Dict[str, int], Dict[str, str]]:
         """
         Anonymize text with consistent replacements.
-        
-        This method is designed to support future multi-recognizer pipelines.
-        Currently uses a single scanner, but the architecture allows for:
-        - Multiple detection passes with different recognizers
-        - Duplicate entity resolution before faker replacement
-        - Custom entity processors for specific use cases
         
         Args:
             text: Text to anonymize
@@ -71,23 +83,16 @@ class PIIAnonymizer:
         if existing_mappings is None:
             existing_mappings = {}
         
-        # PHASE 1: Detection
-        # Future: This could be a loop over multiple scanner configurations
-        vault = Vault()
-        scanner = self.create_scanner()
+        # Create a fresh scanner and vault for this scan
+        scanner, vault = self._create_scanner()
         
-        # Run detection pass - scanner populates vault with found entities
-        sanitized_prompt, is_valid, risk_score = scanner.scan(vault, text)
+        # Run detection - new API doesn't take vault as parameter
+        sanitized_prompt, is_valid, risk_score = scanner.scan(text)
         
         if not is_valid:
             logger.info(f"PII detected with risk score: {risk_score}")
         
-        # PHASE 2: Entity Processing (future extension point)
-        # Future: Add duplicate resolution here (e.g., "Jane Smith" vs "Ms. Smith")
-        # Future: Add entity validation or filtering
-        
-        # PHASE 3: Replacement
-        # Get all vault entries using the proper API
+        # Get vault entries
         vault_entries = vault.get()  # Returns list of (placeholder, original) tuples
         
         # Group entities by type for statistics
@@ -124,17 +129,18 @@ class PIIAnonymizer:
     def _extract_entity_type(self, placeholder: str) -> str:
         """Extract entity type from placeholder format.
         
-        Placeholders follow format: [REDACTED_ENTITY_TYPE_NUM]
         e.g., [REDACTED_PERSON_1] -> PERSON
         """
-        # Remove [REDACTED_ prefix and ] suffix
-        if placeholder.startswith("[REDACTED_") and placeholder.endswith("]"):
-            content = placeholder[10:-1]  # Remove "[REDACTED_" and "]"
-            # Split by underscore and remove the number at the end
-            parts = content.rsplit("_", 1)
-            if len(parts) > 1 and parts[1].isdigit():
-                return parts[0]
-            return content
+        if not placeholder.startswith("[REDACTED_") or not placeholder.endswith("]"):
+            return "UNKNOWN"
+            
+        # Remove [REDACTED_ prefix and ] suffix, then split
+        content = placeholder[10:-1]
+        parts = content.rsplit("_", 1)
+        
+        # Return the type part if we have a number suffix
+        if len(parts) == 2 and parts[1].isdigit():
+            return parts[0]
         return "UNKNOWN"
     
     def _generate_faker_value(self, entity_type: str, original_value: str) -> str:

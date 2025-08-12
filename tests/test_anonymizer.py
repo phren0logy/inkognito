@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
 import random
 
-from anonymizer import PIIAnonymizer
+from anonymizer import PIIAnonymizer, LLM_GUARD_AVAILABLE
 
 
 class TestPIIAnonymizer:
@@ -34,15 +34,16 @@ class TestPIIAnonymizer:
         anonymizer = PIIAnonymizer()
         
         with patch('anonymizer.Anonymize') as mock_anonymize:
-            scanner = anonymizer.create_scanner()
-            
-            mock_anonymize.assert_called_once()
-            call_args = mock_anonymize.call_args[1]
-            
-            assert call_args['entity_types'] == anonymizer.DEFAULT_ENTITY_TYPES
-            assert call_args['score_threshold'] == 0.5
-            assert call_args['use_faker'] is False
-            assert call_args['hide_pii'] is True
+            with patch('anonymizer.Vault') as mock_vault:
+                scanner, vault = anonymizer._create_scanner()
+                
+                mock_vault.assert_called_once()
+                mock_anonymize.assert_called_once()
+                
+                call_args = mock_anonymize.call_args[1]
+                assert call_args['entity_types'] == anonymizer.DEFAULT_ENTITY_TYPES
+                assert call_args['threshold'] == 0.5
+                assert call_args['use_faker'] is False
     
     def test_generate_faker_value_email(self, mock_faker):
         """Test faker value generation for email addresses."""
@@ -177,9 +178,8 @@ class TestPIIAnonymizer:
         # Mock scan to return text without PII
         scanner.scan.return_value = ("No PII here", True, 0.0)
         
-        with patch('anonymizer.PIIAnonymizer.create_scanner', return_value=scanner):
-            with patch('anonymizer.Vault', return_value=mock_vault):
-                text, stats, mappings = anonymizer.anonymize_with_vault("No PII here")
+        with patch('anonymizer.PIIAnonymizer._create_scanner', return_value=(scanner, mock_vault)):
+            text, stats, mappings = anonymizer.anonymize_with_vault("No PII here")
         
         assert text == "No PII here"
         assert stats == {}
@@ -205,11 +205,10 @@ class TestPIIAnonymizer:
             0.95
         )
         
-        with patch('anonymizer.PIIAnonymizer.create_scanner', return_value=scanner):
-            with patch('anonymizer.Vault', return_value=mock_vault):
-                text, stats, mappings = anonymizer.anonymize_with_vault(
-                    "Contact John Smith at john.smith@example.com"
-                )
+        with patch('anonymizer.PIIAnonymizer._create_scanner', return_value=(scanner, mock_vault)):
+            text, stats, mappings = anonymizer.anonymize_with_vault(
+                "Contact John Smith at john.smith@example.com"
+            )
         
         # Verify statistics
         assert stats["PERSON"] == 1
@@ -250,12 +249,11 @@ class TestPIIAnonymizer:
             "john.smith@example.com": "alice.brown@example.com"
         }
         
-        with patch('anonymizer.PIIAnonymizer.create_scanner', return_value=scanner):
-            with patch('anonymizer.Vault', return_value=mock_vault):
-                text, stats, new_mappings = anonymizer.anonymize_with_vault(
-                    "Contact John Smith at john.smith@example.com",
-                    existing_mappings=existing
-                )
+        with patch('anonymizer.PIIAnonymizer._create_scanner', return_value=(scanner, mock_vault)):
+            text, stats, new_mappings = anonymizer.anonymize_with_vault(
+                "Contact John Smith at john.smith@example.com",
+                existing_mappings=existing
+            )
         
         # Should use existing mappings, not create new ones
         assert "Alice Brown" in text
@@ -293,9 +291,8 @@ class TestPIIAnonymizer:
         """
         scanner.scan.return_value = (scan_result, False, 0.95)
         
-        with patch('anonymizer.PIIAnonymizer.create_scanner', return_value=scanner):
-            with patch('anonymizer.Vault', return_value=mock_vault):
-                text, stats, mappings = anonymizer.anonymize_with_vault("Original text")
+        with patch('anonymizer.PIIAnonymizer._create_scanner', return_value=(scanner, mock_vault)):
+            text, stats, mappings = anonymizer.anonymize_with_vault("Original text")
         
         # Verify all entity types were processed
         assert len(stats) == 8
@@ -334,9 +331,8 @@ class TestPIIAnonymizer:
         faker_names = ["Alice Brown", "Bob Green", "Carol White"]
         mock_faker.name.side_effect = faker_names
         
-        with patch('anonymizer.PIIAnonymizer.create_scanner', return_value=scanner):
-            with patch('anonymizer.Vault', return_value=mock_vault):
-                text, stats, mappings = anonymizer.anonymize_with_vault("Original")
+        with patch('anonymizer.PIIAnonymizer._create_scanner', return_value=(scanner, mock_vault)):
+            text, stats, mappings = anonymizer.anonymize_with_vault("Original")
         
         # Each person should get a unique replacement
         assert stats["PERSON"] == 3
@@ -363,11 +359,10 @@ class TestPIIAnonymizer:
         )
         
         # First call
-        with patch('anonymizer.PIIAnonymizer.create_scanner', return_value=scanner):
-            with patch('anonymizer.Vault', return_value=mock_vault1):
-                text1, stats1, mappings1 = anonymizer.anonymize_with_vault(
-                    "John Smith works here"
-                )
+        with patch('anonymizer.PIIAnonymizer._create_scanner', return_value=(scanner, mock_vault1)):
+            text1, stats1, mappings1 = anonymizer.anonymize_with_vault(
+                "John Smith works here"
+            )
         
         # Second call setup - same entity
         mock_vault2 = Mock()
@@ -379,12 +374,11 @@ class TestPIIAnonymizer:
         )
         
         # Second call with same entity and previous mappings
-        with patch('anonymizer.PIIAnonymizer.create_scanner', return_value=scanner):
-            with patch('anonymizer.Vault', return_value=mock_vault2):
-                text2, stats2, mappings2 = anonymizer.anonymize_with_vault(
-                    "John Smith called today",
-                    existing_mappings=mappings1
-                )
+        with patch('anonymizer.PIIAnonymizer._create_scanner', return_value=(scanner, mock_vault2)):
+            text2, stats2, mappings2 = anonymizer.anonymize_with_vault(
+                "John Smith called today",
+                existing_mappings=mappings1
+            )
         
         # Should use same replacement
         assert "Robert Johnson" in text1
@@ -392,3 +386,43 @@ class TestPIIAnonymizer:
         # Verify consistency
         assert mappings1["John Smith"] == "Robert Johnson"
         assert len(mappings2) == 0  # No new mappings since we reused existing
+    
+    def test_init_without_llm_guard(self):
+        """Test that PIIAnonymizer raises error when llm-guard is not available."""
+        with patch('anonymizer.LLM_GUARD_AVAILABLE', False):
+            with pytest.raises(ImportError) as exc_info:
+                PIIAnonymizer()
+            assert "llm-guard is required" in str(exc_info.value)
+    
+    def test_custom_entity_types(self):
+        """Test initialization with custom entity types."""
+        custom_types = ["EMAIL_ADDRESS", "PERSON"]
+        anonymizer = PIIAnonymizer(entity_types=custom_types)
+        assert anonymizer.entity_types == custom_types
+    
+    def test_scanner_api_compatibility(self):
+        """Test that scanner is created with correct API parameters."""
+        anonymizer = PIIAnonymizer()
+        
+        with patch('anonymizer.Vault') as mock_vault_class:
+            with patch('anonymizer.Anonymize') as mock_anonymize_class:
+                with patch('anonymizer.DISTILBERT_AI4PRIVACY_v2_CONF', {'test': 'config'}):
+                    mock_vault_instance = Mock()
+                    mock_vault_class.return_value = mock_vault_instance
+                    
+                    scanner, vault = anonymizer._create_scanner()
+                    
+                    # Verify Anonymize was called with correct new API
+                    mock_anonymize_class.assert_called_once_with(
+                        vault=mock_vault_instance,
+                        entity_types=anonymizer.DEFAULT_ENTITY_TYPES,
+                        threshold=0.5,
+                        use_faker=False,
+                        recognizer_conf={'test': 'config'}
+                    )
+                    
+                    # Verify it does NOT have old parameters
+                    call_kwargs = mock_anonymize_class.call_args[1]
+                    assert 'model_config' not in call_kwargs
+                    assert 'score_threshold' not in call_kwargs
+                    assert 'hide_pii' not in call_kwargs
