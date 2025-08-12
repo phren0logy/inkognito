@@ -83,8 +83,9 @@ class DoclingExtractor(BaseExtractor):
     def _get_converter(self):
         """Get or create the document converter with platform-specific OCR."""
         if not self._converter:
-            from docling.document_converter import DocumentConverter
+            from docling.document_converter import DocumentConverter, PdfFormatOption
             from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.datamodel.base_models import InputFormat
             
             # Get platform-specific OCR options
             ocr_options = self._get_ocr_options()
@@ -95,9 +96,11 @@ class DoclingExtractor(BaseExtractor):
                 ocr_options=ocr_options
             )
             
-            # Create converter with pipeline options
+            # Create converter with format_options (correct API)
             self._converter = DocumentConverter(
-                pipeline_options={'pdf': pdf_options}
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options)
+                }
             )
         return self._converter
     

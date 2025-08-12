@@ -42,17 +42,32 @@ class TestFastMCPIntegration:
             assert tool in dir(server_module)
     
     @pytest.mark.asyncio
-    async def test_context_injection(self, mock_context):
-        """Test that FastMCP context is properly injected."""
-        with patch('server.server.get_context', return_value=mock_context):
-            # Call report_progress which uses context
-            from server import report_progress
-            await report_progress("Test message", 0.5)
+    async def test_context_injection(self, mock_context, temp_directory):
+        """Test that FastMCP context is properly injected into tools."""
+        # Create a test file
+        test_file = temp_directory / "test.md"
+        test_file.write_text("# Test Document\n\nSome content.")
+        
+        # Mock the extractors to avoid external dependencies
+        with patch('server.registry') as mock_registry:
+            # Test that tools can receive context parameter
+            # This verifies the function signature includes ctx: Context
+            from inspect import signature
+            import server as server_module
             
-            mock_context.report_progress.assert_called_once_with("Test message", 0.5)
+            # Check all tools have ctx: Context parameter
+            tools = ['anonymize_documents', 'restore_documents', 'extract_document', 
+                    'segment_document', 'split_into_prompts']
+            
+            for tool_name in tools:
+                tool_wrapper = getattr(server_module, tool_name)
+                # Access the actual function through .fn attribute
+                tool_func = tool_wrapper.fn
+                sig = signature(tool_func)
+                assert 'ctx' in sig.parameters, f"{tool_name} missing ctx parameter"
     
     @pytest.mark.asyncio
-    async def test_tool_return_types(self, temp_directory):
+    async def test_tool_return_types(self, temp_directory, mock_context):
         """Test that all tools return ProcessingResult."""
         # Test with minimal valid inputs
         test_file = temp_directory / "test.md"
@@ -61,33 +76,36 @@ class TestFastMCPIntegration:
         # Test extract_document
         from server import extract_document
         with patch('server.registry.auto_select', return_value=None):
-            result = await extract_document(str(test_file))
+            result = await extract_document.fn(str(test_file), mock_context)
             assert isinstance(result, ProcessingResult)
         
         # Test segment_document
         from server import segment_document
-        result = await segment_document(
+        result = await segment_document.fn(
             str(test_file),
-            str(temp_directory / "segments")
+            str(temp_directory / "segments"),
+            mock_context
         )
         assert isinstance(result, ProcessingResult)
         
         # Test split_into_prompts
         from server import split_into_prompts
-        result = await split_into_prompts(
+        result = await split_into_prompts.fn(
             str(test_file),
-            str(temp_directory / "prompts")
+            str(temp_directory / "prompts"),
+            mock_context
         )
         assert isinstance(result, ProcessingResult)
     
     @pytest.mark.asyncio
-    async def test_error_handling_in_tools(self, temp_directory):
+    async def test_error_handling_in_tools(self, temp_directory, mock_context):
         """Test that tools handle errors gracefully."""
         # Test with non-existent file
         from server import anonymize_documents
         
-        result = await anonymize_documents(
+        result = await anonymize_documents.fn(
             output_dir=str(temp_directory),
+            ctx=mock_context,
             files=["/nonexistent/file.txt"]
         )
         
@@ -96,15 +114,29 @@ class TestFastMCPIntegration:
         assert "not found" in result.message.lower()
     
     @pytest.mark.asyncio
-    async def test_progress_reporting_fallback(self):
-        """Test progress reporting without context."""
-        with patch('server.server.get_context', return_value=None):
-            with patch('server.logger.info') as mock_logger:
-                from server import report_progress
-                await report_progress("Test without context")
-                
-                mock_logger.assert_called_once()
-                assert "Test without context" in mock_logger.call_args[0][0]
+    async def test_progress_reporting_with_context(self, mock_context):
+        """Test that tools use context for progress reporting."""
+        # Create a simple test that verifies context methods are called
+        from server import segment_document
+        from pathlib import Path
+        
+        # Create a test file
+        test_file = Path("/tmp/test.md")
+        test_file.write_text("# Test\n\n" + ("Some content\n" * 100))
+        
+        # Run segment tool - it should use context for progress
+        result = await segment_document.fn(
+            str(test_file),
+            "/tmp/segments",
+            mock_context
+        )
+        
+        # Verify context methods were called
+        mock_context.info.assert_called()
+        mock_context.report_progress.assert_called()
+        
+        # Clean up
+        test_file.unlink()
     
     def test_processing_result_serialization(self):
         """Test that ProcessingResult can be serialized for FastMCP."""
@@ -135,13 +167,14 @@ class TestFastMCPIntegration:
         assert parsed["output_paths"] == result.output_paths
     
     @pytest.mark.asyncio
-    async def test_tool_parameter_validation(self, temp_directory):
+    async def test_tool_parameter_validation(self, temp_directory, mock_context):
         """Test that tools validate parameters properly."""
         from server import anonymize_documents
         
         # Test missing required parameters
-        result = await anonymize_documents(
-            output_dir=str(temp_directory)
+        result = await anonymize_documents.fn(
+            output_dir=str(temp_directory),
+            ctx=mock_context
             # Missing both 'files' and 'directory'
         )
         
@@ -149,7 +182,7 @@ class TestFastMCPIntegration:
         assert "Either 'files' or 'directory'" in result.message
     
     @pytest.mark.asyncio
-    async def test_concurrent_tool_execution(self, temp_directory, sample_files):
+    async def test_concurrent_tool_execution(self, temp_directory, sample_files, mock_context):
         """Test running multiple tools concurrently."""
         from server import segment_document, split_into_prompts
         import asyncio
@@ -163,8 +196,8 @@ class TestFastMCPIntegration:
         
         # Run tools concurrently
         results = await asyncio.gather(
-            segment_document(str(file1), str(temp_directory / "seg1")),
-            split_into_prompts(str(file2), str(temp_directory / "split2")),
+            segment_document.fn(str(file1), str(temp_directory / "seg1"), mock_context),
+            split_into_prompts.fn(str(file2), str(temp_directory / "split2"), mock_context),
             return_exceptions=True
         )
         
@@ -185,30 +218,39 @@ class TestFastMCPIntegration:
         ]
         
         for tool_name in tools:
-            tool = getattr(server_module, tool_name)
+            tool_wrapper = getattr(server_module, tool_name)
+            # Access the actual function through .fn
+            tool = tool_wrapper.fn
             assert tool.__doc__ is not None
             assert len(tool.__doc__) > 50  # Meaningful documentation
             assert "Args:" in tool.__doc__  # Documents parameters
             assert "Returns:" in tool.__doc__  # Documents return value
     
     @pytest.mark.asyncio
-    async def test_tool_metadata_preservation(self, temp_directory):
+    async def test_tool_metadata_preservation(self, temp_directory, mock_context):
         """Test that tools preserve metadata through processing."""
         from server import anonymize_documents
         
+        # Create a test file
+        test_file = temp_directory / "test.md"
+        test_file.write_text("Test content with PII")
+        
         # Mock the anonymizer to include metadata
-        with patch('anonymizer.PIIAnonymizer.anonymize_with_vault') as mock_anon:
-            mock_anon.return_value = (
+        with patch('server.PIIAnonymizer') as mock_anonymizer_class:
+            mock_anonymizer = Mock()
+            mock_anonymizer_class.return_value = mock_anonymizer
+            mock_anonymizer.generate_date_offset.return_value = 180
+            mock_anonymizer.anonymize_with_vault.return_value = (
                 "Anonymized content",
                 {"PERSON": 2, "EMAIL": 1},
-                {"John": ["Bob", "John"]}
+                {"John": "Bob", "jane@example.com": "fake@example.com"}
             )
             
-            with patch('anonymizer.PIIAnonymizer.create_scanner'):
-                result = await anonymize_documents(
-                    output_dir=str(temp_directory),
-                    files=[str(temp_directory / "test.md")]
-                )
+            result = await anonymize_documents.fn(
+                output_dir=str(temp_directory),
+                ctx=mock_context,
+                files=[str(test_file)]
+            )
         
         # ProcessingResult should contain statistics
         assert result.statistics is not None

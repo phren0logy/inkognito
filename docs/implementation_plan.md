@@ -408,3 +408,39 @@ The implementation is complete when:
 8. Server runs via `fastmcp run inkognito`
 9. Can be installed via pip/uvx
 10. Works seamlessly with Claude Desktop
+
+## 11. Implementation Updates
+
+### 11.1 Docling API Fix (December 2024)
+
+The Docling extractor was updated to use the correct DocumentConverter API:
+
+**Issue**: DocumentConverter was incorrectly using `pipeline_options` parameter
+**Fix**: Changed to use `format_options` with InputFormat mapping:
+
+```python
+# Correct API usage
+self._converter = DocumentConverter(
+    format_options={
+        InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options)
+    }
+)
+```
+
+### 11.2 Current Extractor Status
+
+As of December 2024, the implementation status of extractors is:
+
+1. **Docling** - ✅ Fully implemented with OCR support (OCRMac on macOS, EasyOCR on other platforms)
+2. **Azure Document Intelligence** - ⚠️ Placeholder only (raises NotImplementedError)
+3. **LlamaIndex** - ⚠️ Placeholder only (raises NotImplementedError)
+4. **MinerU** - ⚠️ Placeholder only (raises NotImplementedError)
+
+**Note**: In production, consider disabling the unimplemented extractors in `registry.py` to prevent confusion.
+
+### 11.3 Testing Considerations
+
+The current test suite mocks the entire Docling library, which prevented detection of the API issue. Future improvements should include:
+- Integration tests with real libraries (marked with pytest markers)
+- Higher-level mocking to catch API misuse
+- Validation of constructor parameters in mocked classes

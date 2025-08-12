@@ -136,11 +136,12 @@ def _auto_register():
     """Auto-register available extractors."""
     
     # Try to import and register each extractor
+    # Note: Only Docling is currently implemented, others are placeholders
     extractors_to_try = [
-        ("azure_di", "AzureDIExtractor", "azure"),
-        ("llamaindex", "LlamaIndexExtractor", "llamaindex"),
+        # ("azure_di", "AzureDIExtractor", "azure"),        # Not implemented
+        # ("llamaindex", "LlamaIndexExtractor", "llamaindex"),  # Not implemented
         ("docling", "DoclingExtractor", "docling"),
-        ("mineru", "MinerUExtractor", "mineru")
+        # ("mineru", "MinerUExtractor", "mineru")           # Not implemented
     ]
     
     for module_name, class_name, registry_name in extractors_to_try:

@@ -152,9 +152,18 @@ def mock_llm_guard():
 
 @pytest.fixture
 async def mock_context():
-    """Create a mocked FastMCP context with report_progress."""
+    """Create a mocked FastMCP context with all required methods."""
     context = Mock()
-    context.report_progress = AsyncMock()
+    # Progress reporting
+    context.report_progress = Mock()  # Note: not async in FastMCP
+    # Logging methods (all async)
+    context.info = AsyncMock()
+    context.debug = AsyncMock()
+    context.warning = AsyncMock()
+    context.error = AsyncMock()
+    # State management
+    context.set_state = Mock()
+    context.get_state = Mock()
     return context
 
 

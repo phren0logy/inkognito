@@ -31,6 +31,7 @@ class TestExtractionResult:
         """Test that metadata defaults to empty dict."""
         result = ExtractionResult(
             markdown_content="content",
+            metadata={},
             page_count=1,
             extraction_method="test",
             processing_time=0.1

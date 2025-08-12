@@ -21,6 +21,11 @@ fastmcp run inkognito
 
 ### Configure Claude Desktop
 
+If not already present, you need to make sure you add a filesystem MCP.
+Setting up the default Claude Desktop MCP with Docker allows you to set your input folder as "read-only" so you don't alter the contents, but adding the ",ro" shown below.
+
+Note that "dst" is "destination," which is the path Claude will see in the chat.
+
 Add to your `claude_desktop_config.json`:
 
 ```json
@@ -34,15 +39,11 @@ Add to your `claude_desktop_config.json`:
         "LLAMAPARSE_API_KEY": "your-key-here"
       }
     }
-    // If not already present, you need to make sure you add a filesystem MCP
-    // Setting up the default Claude Desktop MCP with Docker allows you to set your
-    // input folder as "read-only" so you don't alter the contents
-    // Note that "dst" is "destination," which is the path Claude will see
     "filesystem": {
     "command": "docker",
     "args": [
       "run", "-i", "--rm",
-      "--mount", "type=bind,src=/Users/you/Documents/PDFs,dst=/projects/pdfs,ro",  //read only for protection
+      "--mount", "type=bind,src=/Users/you/Documents/PDFs,dst=/projects/pdfs,ro",
       "--mount", "type=bind,src=/Users/you/Documents/ProcessedDocs,dst=/projects/output",
       "mcp/filesystem",
       "/projects"
@@ -78,8 +79,6 @@ In Claude Desktop:
 - **Cloud**: Azure DI, LlamaIndex
 - Auto-selects best available option
 - Fallback to local if cloud fails
-- Platform-optimized OCR: Uses Apple's native OCRMac with livetext framework on macOS for superior performance, and EasyOCR on other platforms
-- Configurable OCR languages via `INKOGNITO_OCR_LANGUAGES` environment variable (e.g., "en,fr,de")
 
 ### ✂️ Intelligent Segmentation
 
@@ -158,9 +157,6 @@ Following FastMCP conventions, all configuration is via environment variables:
 # Optional API keys for cloud extractors
 export AZURE_DI_KEY="your-key-here"
 export LLAMAPARSE_API_KEY="your-key-here"
-
-# Optional OCR language configuration (comma-separated)
-export INKOGNITO_OCR_LANGUAGES="en,fr,de,es"
 ```
 
 ## Examples

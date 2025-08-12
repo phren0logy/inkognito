@@ -176,9 +176,10 @@ test = [
 #### test_fastmcp.py
 - **Test FastMCP server integration**
   - Tool registration
-  - Context injection
-  - Progress reporting
-  - Error handling
+  - Context injection via type hints
+  - Progress reporting through context
+  - Error handling with context
+  - Verify all tools accept `ctx: Context` parameter
 
 ## Test Fixtures (conftest.py)
 
@@ -259,8 +260,69 @@ async def mock_context():
    - HTTP requests
 
 6. **FastMCP Context**
-   - report_progress method
-   - Context retrieval
+   - Context methods: info, debug, warning, error
+   - report_progress(current, total, message)
+   - State management methods
+
+## FastMCP Context Testing
+
+### Context Injection Tests
+- **Test proper context parameter handling**
+  - Verify all tools have `ctx: Context` parameter
+  - Test that context is properly injected by FastMCP
+  - Ensure context methods are callable
+  - Test async context methods (info, debug, etc.)
+
+### Progress Reporting Tests
+- **Test progress reporting through context**
+  - Verify `ctx.report_progress(current, total, message)` works
+  - Test progress values are properly formatted
+  - Test progress messages are logged
+  - Test concurrent progress reporting
+
+### Context Method Tests
+- **Test all context logging methods**
+  - `await ctx.info(message)`
+  - `await ctx.debug(message)`
+  - `await ctx.warning(message)`
+  - `await ctx.error(message)`
+  - Test message formatting and output
+
+## Real Tool Testing
+
+### Minimal Mocking Strategy
+- **Test actual tool execution**
+  - Only mock external services (APIs, cloud services)
+  - Use real file I/O with temp directories
+  - Test with actual FastMCP context
+  - Verify real output files are created
+
+### Tool Integration Tests
+- **Test each tool with real inputs**
+  - `anonymize_documents`: Test with real markdown/PDF files
+  - `restore_documents`: Test with real vault files
+  - `extract_document`: Test with sample PDFs (mock only API calls)
+  - `segment_document`: Test with real markdown, verify segments
+  - `split_into_prompts`: Test with structured markdown
+
+### End-to-End Tool Tests
+- **Test complete workflows without mocks**
+  - Create temp files → anonymize → verify vault → restore → compare
+  - Extract PDF → segment → verify all segments valid
+  - Test error conditions with real file operations
+  - Verify all progress reporting works end-to-end
+
+### Test File: test_tools_with_context.py
+```python
+# Example structure for real tool tests
+@pytest.mark.asyncio
+async def test_anonymize_with_real_context(temp_directory):
+    """Test anonymize_documents with minimal mocking."""
+    # Create real test files
+    # Create mock context with real methods
+    # Call tool with context
+    # Verify real outputs
+```
 
 ## Test Execution
 

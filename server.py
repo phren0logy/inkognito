@@ -1,6 +1,6 @@
 """Inkognito FastMCP Server - Document anonymization and processing."""
 
-from fastmcp import FastMCP
+from fastmcp import FastMCP, Context
 from typing import List, Optional, Dict, Any
 import os
 import glob as glob_module
@@ -34,13 +34,6 @@ class ProcessingResult:
     vault_path: Optional[str] = None
 
 
-async def report_progress(message: str, progress: float = None):
-    """Report progress via FastMCP streaming."""
-    context = server.get_context()
-    if context and hasattr(context, 'report_progress'):
-        await context.report_progress(message, progress)
-    else:
-        logger.info(f"Progress: {message}")
 
 
 def find_files(
@@ -90,6 +83,7 @@ def ensure_output_dir(output_dir: str) -> Path:
 @server.tool()
 async def anonymize_documents(
     output_dir: str,
+    ctx: Context,
     files: Optional[List[str]] = None,
     directory: Optional[str] = None,
     patterns: List[str] = ["*.pdf", "*.md", "*.txt"],
@@ -122,7 +116,7 @@ async def anonymize_documents(
     """
     try:
         # Find files to process
-        await report_progress("Scanning for documents...", 0.1)
+        await ctx.info("Scanning for documents...")
         input_files = find_files(directory, files, patterns, recursive)
         
         if not input_files:
@@ -133,7 +127,7 @@ async def anonymize_documents(
                 message="No files found matching the specified patterns"
             )
         
-        await report_progress(f"Found {len(input_files)} files to anonymize", 0.2)
+        await ctx.info(f"Found {len(input_files)} files to anonymize")
         
         # Prepare output directory
         out_path = ensure_output_dir(output_dir)
@@ -154,10 +148,7 @@ async def anonymize_documents(
         for i, file_path in enumerate(input_files):
             progress = 0.2 + (0.6 * i / len(input_files))
             file_name = Path(file_path).name
-            await report_progress(
-                f"Processing file {i+1} of {len(input_files)}: {file_name}",
-                progress
-            )
+            ctx.report_progress(i+1, len(input_files), f"Processing {file_name}")
             
             # Read file content
             content = ""
@@ -165,7 +156,7 @@ async def anonymize_documents(
             
             if file_type == ".pdf":
                 # Extract PDF to markdown first
-                await report_progress(f"Extracting PDF: {file_name}", progress + 0.1)
+                await ctx.info(f"Extracting PDF: {file_name}")
                 
                 # Use auto-selection to get best available extractor
                 extractor = registry.auto_select(file_path)
@@ -202,7 +193,7 @@ async def anonymize_documents(
             output_paths.append(str(output_file))
         
         # Save vault
-        await report_progress("Saving anonymization vault...", 0.9)
+        await ctx.info("Saving anonymization vault...")
         vault_path = out_path / "vault.json"
         VaultManager.save_vault(vault_path, vault_mappings, date_offset, len(input_files))
         
@@ -229,7 +220,7 @@ Generated: {datetime.now().isoformat()}
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        await report_progress("Anonymization complete!", 1.0)
+        await ctx.info("Anonymization complete!")
         
         return ProcessingResult(
             success=True,
@@ -252,6 +243,7 @@ Generated: {datetime.now().isoformat()}
 @server.tool()
 async def restore_documents(
     output_dir: str,
+    ctx: Context,
     files: Optional[List[str]] = None,
     directory: Optional[str] = None,
     vault_path: Optional[str] = None,
@@ -278,7 +270,7 @@ async def restore_documents(
     """
     try:
         # Find files to restore
-        await report_progress("Scanning for anonymized documents...", 0.1)
+        await ctx.info("Scanning for anonymized documents...")
         input_files = find_files(directory, files, patterns, recursive)
         
         if not input_files:
@@ -311,7 +303,7 @@ async def restore_documents(
                 message="Vault file not found. Cannot restore without vault.json"
             )
         
-        await report_progress("Loading vault data...", 0.2)
+        await ctx.info("Loading vault data...")
         
         # Load vault
         date_offset, mappings = VaultManager.load_vault(Path(vault_path))
@@ -331,10 +323,7 @@ async def restore_documents(
         for i, file_path in enumerate(input_files):
             progress = 0.2 + (0.7 * i / len(input_files))
             file_name = Path(file_path).name
-            await report_progress(
-                f"Restoring file {i+1} of {len(input_files)}: {file_name}",
-                progress
-            )
+            ctx.report_progress(i+1, len(input_files), f"Restoring {file_name}")
             
             # Read anonymized content
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -359,7 +348,7 @@ async def restore_documents(
             output_paths.append(str(output_file))
         
         # Create restoration report
-        await report_progress("Creating restoration report...", 0.95)
+        await ctx.info("Creating restoration report...")
         report_path = out_path / "RESTORATION_REPORT.md"
         report = f"""# Restoration Report
 
@@ -379,7 +368,7 @@ The restored documents are identical to the pre-anonymization versions.
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        await report_progress("Restoration complete!", 1.0)
+        await ctx.info("Restoration complete!")
         
         return ProcessingResult(
             success=True,
@@ -401,6 +390,7 @@ The restored documents are identical to the pre-anonymization versions.
 @server.tool()
 async def extract_document(
     file_path: str,
+    ctx: Context,
     output_path: Optional[str] = None,
     extraction_method: str = "auto"
 ) -> ProcessingResult:
@@ -434,7 +424,7 @@ async def extract_document(
         if not output_path:
             output_path = str(input_path.with_suffix(".md"))
         
-        await report_progress(f"Extracting {input_path.name}...", 0.2)
+        await ctx.info(f"Extracting {input_path.name}...")
         
         # Select extractor
         if extraction_method == "auto":
@@ -465,19 +455,18 @@ async def extract_document(
                 )
         
         # Extract with progress reporting
-        await report_progress(f"Using {extractor.name}...", 0.3)
+        await ctx.info(f"Using {extractor.name}...")
         
         async def progress_callback(progress_info):
             percent = progress_info.get('percent', 0.5)
             adjusted_percent = 0.3 + (percent * 0.6)  # Scale to 30%-90%
-            await report_progress(
-                f"Processing page {progress_info.get('current', '?')}/{progress_info.get('total', '?')}",
-                adjusted_percent
-            )
+            current = progress_info.get('current', 0)
+            total = progress_info.get('total', 100)
+            ctx.report_progress(current, total, f"Processing page {current}/{total}")
         
         result = await extractor.extract(file_path, progress_callback)
         
-        await report_progress("Writing markdown output...", 0.9)
+        await ctx.info("Writing markdown output...")
         
         # Save markdown content
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -493,7 +482,7 @@ async def extract_document(
         }
         statistics.update(result.metadata)
         
-        await report_progress("Extraction complete!", 1.0)
+        await ctx.info("Extraction complete!")
         
         return ProcessingResult(
             success=True,
@@ -516,6 +505,7 @@ async def extract_document(
 async def segment_document(
     file_path: str,
     output_dir: str,
+    ctx: Context,
     max_tokens: int = 15000,
     min_tokens: int = 10000,
     break_at_headings: List[str] = ["h1", "h2"]
@@ -556,13 +546,13 @@ async def segment_document(
                 message="Only markdown or text files can be segmented"
             )
         
-        await report_progress("Reading document...", 0.1)
+        await ctx.info("Reading document...")
         
         # Read content
         with open(input_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        await report_progress("Analyzing document structure...", 0.2)
+        await ctx.info("Analyzing document structure...")
         
         # Segment the document
         segmenter = DocumentSegmenter()
@@ -584,10 +574,7 @@ async def segment_document(
         
         for i, segment in enumerate(segments):
             progress = 0.3 + (0.6 * i / len(segments))
-            await report_progress(
-                f"Writing segment {segment.segment_number} of {segment.total_segments}...",
-                progress
-            )
+            ctx.report_progress(segment.segment_number, segment.total_segments, f"Writing segment {segment.segment_number}")
             
             # Create segment filename
             segment_name = f"{base_name}_{segment.segment_number:03d}_of_{segment.total_segments:03d}.md"
@@ -608,7 +595,7 @@ async def segment_document(
             output_paths.append(str(segment_path))
         
         # Create segmentation report
-        await report_progress("Creating segmentation report...", 0.95)
+        await ctx.info("Creating segmentation report...")
         report_path = out_path / "SEGMENTATION_REPORT.md"
         report = f"""# Segmentation Report
 
@@ -637,7 +624,7 @@ Generated: {datetime.now().isoformat()}
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        await report_progress("Segmentation complete!", 1.0)
+        await ctx.info("Segmentation complete!")
         
         # Statistics
         statistics = {
@@ -668,6 +655,7 @@ Generated: {datetime.now().isoformat()}
 async def split_into_prompts(
     file_path: str,
     output_dir: str,
+    ctx: Context,
     split_level: str = "h2",
     include_parent_context: bool = True,
     prompt_template: Optional[str] = None
@@ -708,13 +696,13 @@ async def split_into_prompts(
                 message="Only markdown or text files can be split into prompts"
             )
         
-        await report_progress("Reading document...", 0.1)
+        await ctx.info("Reading document...")
         
         # Read content
         with open(input_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        await report_progress(f"Splitting by {split_level} headings...", 0.2)
+        await ctx.info(f"Splitting by {split_level} headings...")
         
         # Split into prompts
         segmenter = DocumentSegmenter()
@@ -744,10 +732,7 @@ async def split_into_prompts(
         
         for i, prompt in enumerate(prompts):
             progress = 0.3 + (0.6 * i / len(prompts))
-            await report_progress(
-                f"Writing prompt {prompt.prompt_number} of {prompt.total_prompts}...",
-                progress
-            )
+            ctx.report_progress(prompt.prompt_number, prompt.total_prompts, f"Writing prompt {prompt.prompt_number}")
             
             # Create prompt filename (sanitize heading for filename)
             safe_heading = "".join(c for c in prompt.heading if c.isalnum() or c in (' ', '-', '_')).rstrip()
@@ -772,7 +757,7 @@ async def split_into_prompts(
             output_paths.append(str(prompt_path))
         
         # Create prompt report
-        await report_progress("Creating prompt report...", 0.95)
+        await ctx.info("Creating prompt report...")
         report_path = out_path / "PROMPT_REPORT.md"
         report = f"""# Prompt Generation Report
 
@@ -799,7 +784,7 @@ Generated: {datetime.now().isoformat()}
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        await report_progress("Prompt generation complete!", 1.0)
+        await ctx.info("Prompt generation complete!")
         
         # Statistics
         statistics = {

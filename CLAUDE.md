@@ -16,8 +16,7 @@ Handle depencies with "uv add" and "uv remove". Do not edit pyproject.toml direc
 
 - **Entry Point**: `server.py` - Contains the FastMCP server
 - **Server Pattern**: Uses `server = FastMCP("inkognito")` with `@server.tool()` decorators
-- **Context Handling**: FastMCP automatically injects context - use `server.get_context()` when needed
-- **Progress Reporting**: Use `await report_progress(message, progress)` for streaming updates
+- **Context Handling**: FastMCP automatically injects context via type hints - add `ctx: Context` parameter to tools
 - **Transport**: STDIO only - no HTTP/SSE support
 
 ### Core Components
@@ -50,6 +49,28 @@ Handle depencies with "uv add" and "uv remove". Do not edit pyproject.toml direc
    - Uses tiktoken for accurate token counting
    - Preserves heading context across segments
 
+## FastMCP Context and Progress Monitoring
+
+FastMCP uses dependency injection to provide context to tools:
+
+- **Context Injection**: Add `ctx: Context` parameter to any tool function to receive context
+- **Progress Reporting**: Use `ctx.report_progress(current, total, message)` for progress tracking
+- **Logging Methods**:
+  - `await ctx.info(message)` - Information messages
+  - `await ctx.debug(message)` - Debug messages
+  - `await ctx.warning(message)` - Warning messages
+  - `await ctx.error(message)` - Error messages
+- **Never use**: `server.get_context()` - this doesn't exist in FastMCP
+
+Example tool signature:
+```python
+@server.tool()
+async def my_tool(file_path: str, ctx: Context) -> ProcessingResult:
+    await ctx.info("Starting processing...")
+    ctx.report_progress(1, 10, "Processing file")
+    # ... tool logic
+```
+
 ## Development Commands
 
 ```bash
@@ -64,7 +85,7 @@ fastmcp run inkognito
 
 1. **No Custom Patterns**: The project uses universal PII detection only. Do not add domain-specific patterns or `pattern_sets` parameters.
 
-2. **FastMCP Context**: Never pass `context` as a parameter to tools - FastMCP handles this automatically.
+2. **FastMCP Context**: FastMCP injects context automatically when you add `ctx: Context` parameter to tool functions.
 
 3. **Progress Reporting**: Always report progress for long operations but never include file contents in messages.
 
@@ -86,6 +107,6 @@ When adding a new extractor:
 
 ## Common Issues
 
-- Progress reporting requires FastMCP context - use `server.get_context()`
+- Progress reporting requires FastMCP context - use the injected `ctx` parameter
 - Vault format requires a specific structure - don't modify serialization
 - Entity types must match LLM-Guard's expected values (e.g., "EMAIL_ADDRESS", not "email")
