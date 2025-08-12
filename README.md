@@ -36,7 +36,6 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-
 ### Basic Usage
 
 In Claude Desktop:
@@ -213,14 +212,11 @@ Claude: "I'll split the documentation by endpoints...
 git clone https://github.com/yourusername/inkognito
 cd inkognito
 
-# Install in development mode
-pip install -e .
-
 # Run with FastMCP CLI
 fastmcp dev
 
 # Or run directly
-python -m inkognito
+uv run inkognito
 ```
 
 ### Testing with FastMCP
@@ -231,16 +227,6 @@ fastmcp install inkognito
 
 # Test a specific tool
 fastmcp test inkognito extract_document
-```
-
-### Building for Distribution
-
-```bash
-# Build the package
-python -m build
-
-# Upload to PyPI
-python -m twine upload dist/*
 ```
 
 ## Project Structure

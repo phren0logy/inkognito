@@ -3,7 +3,12 @@
 import re
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
-import tiktoken
+
+try:
+    import tiktoken
+except ImportError:
+    raise ImportError("tiktoken is required. Install with: pip install tiktoken")
+
 import logging
 
 logger = logging.getLogger(__name__)

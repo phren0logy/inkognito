@@ -3,6 +3,7 @@
 from typing import Dict, Type, Optional, List, Any
 import os
 import logging
+from pathlib import Path
 
 from .base import BaseExtractor, ExtractionResult
 
@@ -144,7 +145,7 @@ def _auto_register():
     
     for module_name, class_name, registry_name in extractors_to_try:
         try:
-            module = __import__(f"sample_code.extractors.{module_name}", fromlist=[class_name])
+            module = __import__(f"inkognito.extractors.{module_name}", fromlist=[class_name])
             extractor_class = getattr(module, class_name)
             extractor = extractor_class()
             registry.register(registry_name, extractor)
@@ -156,7 +157,3 @@ def _auto_register():
 
 # Run auto-registration on import
 _auto_register()
-
-
-# Export key items
-__all__ = ["registry", "BaseExtractor", "ExtractionResult"]

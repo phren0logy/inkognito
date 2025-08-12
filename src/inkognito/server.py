@@ -1,4 +1,4 @@
-"""Inkognito MCP Server - Document anonymization and processing."""
+"""Inkognito FastMCP Server - Document anonymization and processing."""
 
 from fastmcp import FastMCP
 from typing import List, Optional, Dict, Any
@@ -11,17 +11,23 @@ from dataclasses import dataclass
 
 # Import our modules
 from .extractors import registry
-from .anonymizer import PIIAnonymizer, AnonymizationConfig
+from .anonymizer import PIIAnonymizer
 from .vault import VaultManager
 from .segmenter import DocumentSegmenter
-# Pattern registry removed - using universal detection only
+from .exceptions import InkognitoError, ExtractionError, AnonymizationError, VaultError, SegmentationError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize MCP server
-mcp = FastMCP("Inkognito")
+# Initialize FastMCP server
+server = FastMCP("inkognito")
+
+# Add metadata
+server.meta(
+    description="Privacy-preserving document processing",
+    version="0.1.0"
+)
 
 
 @dataclass
@@ -34,10 +40,11 @@ class ProcessingResult:
     vault_path: Optional[str] = None
 
 
-async def report_progress(context: Any, message: str, progress: float = None):
-    """Report progress to MCP client in a privacy-preserving way."""
-    if hasattr(context, 'report_progress'):
-        await context.report_progress(message=message, progress=progress)
+async def report_progress(message: str, progress: float = None):
+    """Report progress via FastMCP streaming."""
+    context = server.get_context()
+    if context and hasattr(context, 'report_progress'):
+        await context.report_progress(message, progress)
     else:
         logger.info(f"Progress: {message}")
 
@@ -86,18 +93,16 @@ def ensure_output_dir(output_dir: str) -> Path:
     return out_path
 
 
-@mcp.tool()
+@server.tool()
 async def anonymize_documents(
     output_dir: str,
     files: Optional[List[str]] = None,
     directory: Optional[str] = None,
     patterns: List[str] = ["*.pdf", "*.md", "*.txt"],
     recursive: bool = True,
-    pattern_sets: List[str] = [],
     entity_types: Optional[List[str]] = None,
     score_threshold: float = 0.5,
-    date_shift_days: int = 365,
-    context: Optional[Any] = None
+    date_shift_days: int = 365
 ) -> ProcessingResult:
     """
     Anonymize documents by replacing PII with realistic fake data.
@@ -114,13 +119,16 @@ async def anonymize_documents(
         directory: Directory to scan for files (optional, use files OR directory)
         patterns: File patterns to match (default: PDF, markdown, text)
         recursive: Include subdirectories when scanning (default: true)
+        entity_types: Optional list of specific entity types to detect
+        score_threshold: Confidence threshold for PII detection (default: 0.5)
+        date_shift_days: Maximum days to shift dates (default: 365)
     
     Returns:
         ProcessingResult with output paths, statistics, and vault location
     """
     try:
         # Find files to process
-        await report_progress( "Scanning for documents...", 0.1)
+        await report_progress("Scanning for documents...", 0.1)
         input_files = find_files(directory, files, patterns, recursive)
         
         if not input_files:
@@ -131,22 +139,15 @@ async def anonymize_documents(
                 message="No files found matching the specified patterns"
             )
         
-        await report_progress( f"Found {len(input_files)} files to anonymize", 0.2)
+        await report_progress(f"Found {len(input_files)} files to anonymize", 0.2)
         
         # Prepare output directory
         out_path = ensure_output_dir(output_dir)
         anon_path = out_path / "anonymized"
         anon_path.mkdir(exist_ok=True)
         
-        # Initialize anonymization
-        config = AnonymizationConfig(
-            entity_types=entity_types,
-            pattern_sets=pattern_sets,
-            score_threshold=score_threshold,
-            date_shift_days=date_shift_days
-        )
-        
-        anonymizer = PIIAnonymizer(config)
+        # Initialize anonymizer
+        anonymizer = PIIAnonymizer()
         
         # Generate date offset for this session
         date_offset = anonymizer.generate_date_offset(date_shift_days)
@@ -160,7 +161,6 @@ async def anonymize_documents(
             progress = 0.2 + (0.6 * i / len(input_files))
             file_name = Path(file_path).name
             await report_progress(
-                context,
                 f"Processing file {i+1} of {len(input_files)}: {file_name}",
                 progress
             )
@@ -171,7 +171,7 @@ async def anonymize_documents(
             
             if file_type == ".pdf":
                 # Extract PDF to markdown first
-                await report_progress( f"Extracting PDF: {file_name}", progress + 0.1)
+                await report_progress(f"Extracting PDF: {file_name}", progress + 0.1)
                 
                 # Use auto-selection to get best available extractor
                 extractor = registry.auto_select(file_path)
@@ -185,8 +185,6 @@ async def anonymize_documents(
                 # Read text/markdown files directly
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-            
-            # Universal PII detection - no custom patterns needed
             
             # Anonymize content
             anonymized_text, statistics, new_mappings = anonymizer.anonymize_with_vault(
@@ -210,7 +208,7 @@ async def anonymize_documents(
             output_paths.append(str(output_file))
         
         # Save vault
-        await report_progress( "Saving anonymization vault...", 0.9)
+        await report_progress("Saving anonymization vault...", 0.9)
         vault_path = out_path / "vault.json"
         VaultManager.save_vault(vault_path, vault_mappings, date_offset, len(input_files))
         
@@ -237,7 +235,7 @@ Generated: {datetime.now().isoformat()}
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        await report_progress( "Anonymization complete!", 1.0)
+        await report_progress("Anonymization complete!", 1.0)
         
         return ProcessingResult(
             success=True,
@@ -257,15 +255,14 @@ Generated: {datetime.now().isoformat()}
         )
 
 
-@mcp.tool()
+@server.tool()
 async def restore_documents(
     output_dir: str,
     files: Optional[List[str]] = None,
     directory: Optional[str] = None,
     vault_path: Optional[str] = None,
     patterns: List[str] = ["*.md"],
-    recursive: bool = True,
-    context: Optional[Any] = None
+    recursive: bool = True
 ) -> ProcessingResult:
     """
     Restore original PII in anonymized documents using vault.
@@ -287,7 +284,7 @@ async def restore_documents(
     """
     try:
         # Find files to restore
-        await report_progress( "Scanning for anonymized documents...", 0.1)
+        await report_progress("Scanning for anonymized documents...", 0.1)
         input_files = find_files(directory, files, patterns, recursive)
         
         if not input_files:
@@ -320,7 +317,7 @@ async def restore_documents(
                 message="Vault file not found. Cannot restore without vault.json"
             )
         
-        await report_progress( "Loading vault data...", 0.2)
+        await report_progress("Loading vault data...", 0.2)
         
         # Load vault
         date_offset, mappings = VaultManager.load_vault(Path(vault_path))
@@ -341,7 +338,6 @@ async def restore_documents(
             progress = 0.2 + (0.7 * i / len(input_files))
             file_name = Path(file_path).name
             await report_progress(
-                context,
                 f"Restoring file {i+1} of {len(input_files)}: {file_name}",
                 progress
             )
@@ -369,7 +365,7 @@ async def restore_documents(
             output_paths.append(str(output_file))
         
         # Create restoration report
-        await report_progress( "Creating restoration report...", 0.95)
+        await report_progress("Creating restoration report...", 0.95)
         report_path = out_path / "RESTORATION_REPORT.md"
         report = f"""# Restoration Report
 
@@ -389,7 +385,7 @@ The restored documents are identical to the pre-anonymization versions.
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        await report_progress( "Restoration complete!", 1.0)
+        await report_progress("Restoration complete!", 1.0)
         
         return ProcessingResult(
             success=True,
@@ -566,13 +562,13 @@ async def segment_document(
                 message="Only markdown or text files can be segmented"
             )
         
-        await report_progress( "Reading document...", 0.1)
+        await report_progress("Reading document...", 0.1)
         
         # Read content
         with open(input_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        await report_progress( "Analyzing document structure...", 0.2)
+        await report_progress("Analyzing document structure...", 0.2)
         
         # Segment the document
         segmenter = DocumentSegmenter()
@@ -595,7 +591,6 @@ async def segment_document(
         for i, segment in enumerate(segments):
             progress = 0.3 + (0.6 * i / len(segments))
             await report_progress(
-                context,
                 f"Writing segment {segment.segment_number} of {segment.total_segments}...",
                 progress
             )
@@ -619,7 +614,7 @@ async def segment_document(
             output_paths.append(str(segment_path))
         
         # Create segmentation report
-        await report_progress( "Creating segmentation report...", 0.95)
+        await report_progress("Creating segmentation report...", 0.95)
         report_path = out_path / "SEGMENTATION_REPORT.md"
         report = f"""# Segmentation Report
 
@@ -648,7 +643,7 @@ Generated: {datetime.now().isoformat()}
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        await report_progress( "Segmentation complete!", 1.0)
+        await report_progress("Segmentation complete!", 1.0)
         
         # Statistics
         statistics = {
@@ -719,13 +714,13 @@ async def split_into_prompts(
                 message="Only markdown or text files can be split into prompts"
             )
         
-        await report_progress( "Reading document...", 0.1)
+        await report_progress("Reading document...", 0.1)
         
         # Read content
         with open(input_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        await report_progress( f"Splitting by {split_level} headings...", 0.2)
+        await report_progress(f"Splitting by {split_level} headings...", 0.2)
         
         # Split into prompts
         segmenter = DocumentSegmenter()
@@ -756,7 +751,6 @@ async def split_into_prompts(
         for i, prompt in enumerate(prompts):
             progress = 0.3 + (0.6 * i / len(prompts))
             await report_progress(
-                context,
                 f"Writing prompt {prompt.prompt_number} of {prompt.total_prompts}...",
                 progress
             )
@@ -784,7 +778,7 @@ async def split_into_prompts(
             output_paths.append(str(prompt_path))
         
         # Create prompt report
-        await report_progress( "Creating prompt report...", 0.95)
+        await report_progress("Creating prompt report...", 0.95)
         report_path = out_path / "PROMPT_REPORT.md"
         report = f"""# Prompt Generation Report
 
@@ -811,7 +805,7 @@ Generated: {datetime.now().isoformat()}
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(report)
         
-        await report_progress( "Prompt generation complete!", 1.0)
+        await report_progress("Prompt generation complete!", 1.0)
         
         # Statistics
         statistics = {
@@ -837,29 +831,3 @@ Generated: {datetime.now().isoformat()}
             statistics={},
             message=f"Prompt generation failed: {str(e)}"
         )
-
-
-# Main entry point
-def main():
-    """Run the MCP server."""
-    import sys
-    
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    # Run the server
-    try:
-        server.run()
-    except KeyboardInterrupt:
-        print("\nShutting down Inkognito FastMCP server...")
-        sys.exit(0)
-    except Exception as e:
-        print(f"Error running FastMCP server: {e}")
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

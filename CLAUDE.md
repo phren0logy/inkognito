@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Inkognito is a FastMCP server for privacy-preserving document processing. It provides PDF-to-markdown conversion, intelligent PII anonymization with reversible vaults, and document segmentation through FastMCP's tool interface.
 
+Keep code clean, clear, and uncomplicated. Follow FastMCP 2.11+ best practices and idioms. Avoid unecessary complexity. Make clean, breaking changes without regard to backward compatibility.
+
+Handle depencies with "uv add" and "uv remove". Do not edit pyproject.toml directly to add or remove dependencies.
+
 ## Key Architecture Components
 
 ### FastMCP Server Structure
@@ -51,7 +55,7 @@ This sample code can be deleted after the relevant component is implemented.
 # Run the FastMCP server (from project root)
 uv run inkognito.server
 
-# Test with FastMCP CLI
+# Test with FastMCP CLI (preferred)
 fastmcp run inkognito
 ```
 

@@ -6,9 +6,12 @@ from datetime import timedelta
 import random
 from faker import Faker
 
-from llm_guard.input_scanners import Anonymize
-from llm_guard.input_scanners.anonymize_helpers import DISTILBERT_AI4PRIVACY_v2_CONF #confirm this is the best model before implementation
-from llm_guard.vault import Vault
+try:
+    from llm_guard.input_scanners import Anonymize
+    from llm_guard.input_scanners.anonymize_helpers import DISTILBERT_AI4PRIVACY_v2_CONF
+    from llm_guard.vault import Vault
+except ImportError:
+    raise ImportError("llm-guard is required. Install with: pip install llm-guard")
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +19,7 @@ logger = logging.getLogger(__name__)
 class PIIAnonymizer:
     """Handles PII detection and anonymization with consistent replacements."""
     
-    # Universal PII scanners - comprehensive defaults
+    # Universal PII types - comprehensive defaults
     DEFAULT_ENTITY_TYPES = [
         "EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", 
         "US_SSN", "PASSPORT", "US_DRIVER_LICENSE",
@@ -26,11 +29,10 @@ class PIIAnonymizer:
     ]
     
     def __init__(self):
+        """Initialize anonymizer with faker and default settings."""
         self.faker = Faker()
         Faker.seed(random.randint(0, 10000))  # Random seed for each session
         self.date_shift_days = 365  # Default date shifting range
-
-
     
     def create_scanner(self) -> Anonymize:
         """Create LLM-Guard scanner instance with universal defaults."""

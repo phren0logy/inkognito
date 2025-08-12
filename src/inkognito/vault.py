@@ -31,14 +31,18 @@ class VaultManager:
         Returns:
             Serialized vault data
         """
+        # Calculate statistics
+        total_replacements = len(mappings)
+        
         return {
             "version": VaultManager.VAULT_VERSION,
-            "created": datetime.now().isoformat(),
-            "metadata": {
-                "date_offset": date_offset,
-                "total_files": total_files
+            "date_offset": date_offset,
+            "mappings": mappings,
+            "statistics": {
+                "files_processed": total_files,
+                "total_replacements": total_replacements
             },
-            "mappings": [[replacement, original] for original, replacement in mappings.items()]
+            "created_at": datetime.now().isoformat()
         }
     
     @staticmethod
@@ -59,13 +63,8 @@ class VaultManager:
         
         # Handle v2.0 format
         if vault_data.get("version") == "2.0":
-            date_offset = vault_data.get("metadata", {}).get("date_offset")
-            
-            # Convert [replacement, original] pairs to {original: replacement}
-            mappings = {}
-            for replacement, original in vault_data.get("mappings", []):
-                mappings[original] = replacement
-            
+            date_offset = vault_data.get("date_offset")
+            mappings = vault_data.get("mappings", {})
             return date_offset, mappings
         
         # Handle legacy formats if needed
