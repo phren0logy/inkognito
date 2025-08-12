@@ -2,7 +2,7 @@
 
 import sys
 import logging
-from server import server
+from .server import server
 
 def main():
     """Entry point for FastMCP server."""

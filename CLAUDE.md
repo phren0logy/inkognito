@@ -35,6 +35,9 @@ Handle depencies with "uv add" and "uv remove". Do not edit pyproject.toml direc
    - Registry pattern in `__init__.py` for auto-discovery
    - Priority order: Azure DI → LlamaIndex → MinerU → Docling
    - Import path: `extractors`
+   - Docling uses platform-specific OCR:
+     - macOS: OCRMac with livetext framework
+     - Other platforms: EasyOCR
 
 3. **Vault System** (`vault.py`)
 
@@ -70,6 +73,7 @@ fastmcp run inkognito
 5. **Configuration**: All config via environment variables only:
    - `AZURE_DI_KEY` - For Azure Document Intelligence
    - `LLAMAPARSE_API_KEY` - For LlamaIndex extraction
+   - `INKOGNITO_OCR_LANGUAGES` - Comma-separated list of OCR languages (e.g., "en,fr,de")
 
 ## Testing New Extractors
 

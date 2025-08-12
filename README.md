@@ -78,6 +78,8 @@ In Claude Desktop:
 - **Cloud**: Azure DI, LlamaIndex
 - Auto-selects best available option
 - Fallback to local if cloud fails
+- Platform-optimized OCR: Uses Apple's native OCRMac with livetext framework on macOS for superior performance, and EasyOCR on other platforms
+- Configurable OCR languages via `INKOGNITO_OCR_LANGUAGES` environment variable (e.g., "en,fr,de")
 
 ### ✂️ Intelligent Segmentation
 
@@ -156,6 +158,9 @@ Following FastMCP conventions, all configuration is via environment variables:
 # Optional API keys for cloud extractors
 export AZURE_DI_KEY="your-key-here"
 export LLAMAPARSE_API_KEY="your-key-here"
+
+# Optional OCR language configuration (comma-separated)
+export INKOGNITO_OCR_LANGUAGES="en,fr,de,es"
 ```
 
 ## Examples
