@@ -10,11 +10,11 @@ import logging
 from dataclasses import dataclass
 
 # Import our modules
-from .extractors import registry
-from .anonymizer import PIIAnonymizer
-from .vault import VaultManager
-from .segmenter import DocumentSegmenter
-from .exceptions import InkognitoError, ExtractionError, AnonymizationError, VaultError, SegmentationError
+from extractors import registry
+from anonymizer import PIIAnonymizer
+from vault import VaultManager
+from segmenter import DocumentSegmenter
+from exceptions import InkognitoError, ExtractionError, AnonymizationError, VaultError, SegmentationError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

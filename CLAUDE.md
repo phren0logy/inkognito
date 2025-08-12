@@ -14,7 +14,7 @@ Handle depencies with "uv add" and "uv remove". Do not edit pyproject.toml direc
 
 ### FastMCP Server Structure
 
-- **Entry Point**: `sample_code/server.py` - Contains the FastMCP server sample code to build on
+- **Entry Point**: `server.py` - Contains the FastMCP server
 - **Server Pattern**: Uses `server = FastMCP("inkognito")` with `@server.tool()` decorators
 - **Context Handling**: FastMCP automatically injects context - use `server.get_context()` when needed
 - **Progress Reporting**: Use `await report_progress(message, progress)` for streaming updates
@@ -22,27 +22,27 @@ Handle depencies with "uv add" and "uv remove". Do not edit pyproject.toml direc
 
 ### Core Components
 
-1. **Anonymizer** (`src/anonymizer.py`)
+1. **Anonymizer** (`anonymizer.py`)
 
    - Universal PII detection using LLM-Guard with 15 default entity types
    - No configuration needed - comprehensive defaults only
    - Consistent faker replacements across documents
    - Vault-based reversibility
 
-2. **Extractors** (`src/extractors/`)
+2. **Extractors** (`extractors/`)
 
    - Base interface in `base.py` - all extractors must implement this
    - Registry pattern in `__init__.py` for auto-discovery
    - Priority order: Azure DI → LlamaIndex → MinerU → Docling
-   - Import path: `sample_code.extractors` (not `inkognito.extractors`)
+   - Import path: `extractors`
 
-3. **Vault System** (`src/vault.py`)
+3. **Vault System** (`vault.py`)
 
    - v2.0 format with [replacement, original] mappings
    - Stores date offset for consistent date shifting
    - Enables complete PII restoration
 
-4. **Segmenter** (`src/segmenter.py`)
+4. **Segmenter** (`segmenter.py`)
    - Two modes: large document chunks (10k-30k tokens) and prompt splitting
    - Uses tiktoken for accurate token counting
    - Preserves heading context across segments
