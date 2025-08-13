@@ -231,12 +231,12 @@ async def anonymize_documents(
 @server.tool()
 async def extract_document(
     file_path: str,
+    ctx: Context,
     output_path: Optional[str] = None,
     extraction_method: str = "auto"
 ) -> ProcessingResult:
     """Convert PDF/DOCX to markdown."""
-    # FastMCP handles progress context automatically
-    context = server.get_context()
+    # FastMCP injects context via type hints
     
     if extraction_method == "auto":
         # Smart selection with fallback
@@ -246,7 +246,7 @@ async def extract_document(
             if extractor and extractor.is_available():
                 try:
                     # Report progress via FastMCP
-                    await context.report_progress(
+                    ctx.report_progress(
                         f"Extracting with {extractor.name}...",
                         0.1
                     )
@@ -426,22 +426,23 @@ Following FastMCP conventions:
 ```
 inkognito/
 ├── pyproject.toml          # Modern Python packaging
-├── src/
-│   └── inkognito/
-│       ├── __init__.py
-│       ├── __main__.py     # Entry point for python -m
-│       ├── server.py       # FastMCP server setup
-│       ├── anonymizer.py   # Universal PII detection
-│       ├── vault.py        # Mapping storage
-│       ├── segmenter.py    # Document splitting
-│       └── extractors/
-│           ├── __init__.py
-│           ├── base.py     # Base interface
-│           ├── registry.py # Auto-discovery
-│           ├── azure_di.py
-│           ├── llamaindex.py
-│           ├── docling.py
-│           └── mineru.py
+├── LICENSE                 # MIT license
+├── README.md               # Project documentation
+├── __init__.py
+├── __main__.py             # Entry point for python -m
+├── server.py               # FastMCP server setup
+├── anonymizer.py           # Universal PII detection
+├── vault.py                # Mapping storage
+├── segmenter.py            # Document splitting
+├── exceptions.py           # Custom exception classes
+├── extractors/
+│   ├── __init__.py
+│   ├── base.py             # Base interface
+│   ├── registry.py         # Auto-discovery
+│   ├── azure_di.py         # Azure Document Intelligence
+│   ├── llamaindex.py       # LlamaIndex/LlamaParse
+│   ├── docling.py          # Docling (default)
+│   └── mineru.py           # MinerU
 └── tests/
 ```
 
@@ -505,7 +506,7 @@ pip install -e .
 The `__main__.py` provides the standard entry point:
 
 ```python
-# src/inkognito/__main__.py
+# __main__.py
 import asyncio
 from .server import create_server
 

@@ -53,7 +53,7 @@ Add to your `claude_desktop_config.json`:
       "description": null,
       "icon": null,
       "authentication": null
-    },
+    }
   }
 }
 ```
@@ -156,12 +156,12 @@ restore_documents(
 
 ## Extractor Status
 
-| Extractor | Status | Notes |
-|-----------|--------|-------|
-| **Docling** | ✅ Fully Implemented | Default extractor with OCR support (OCRMac on macOS, EasyOCR on other platforms) |
-| **Azure DI** | ⚠️ Placeholder | Requires `AZURE_DI_KEY` environment variable when implemented |
-| **LlamaIndex** | ⚠️ Placeholder | Requires `LLAMAPARSE_API_KEY` environment variable when implemented |
-| **MinerU** | ⚠️ Placeholder | Will require magic-pdf library when implemented |
+| Extractor      | Status               | Notes                                                                            |
+| -------------- | -------------------- | -------------------------------------------------------------------------------- |
+| **Docling**    | ✅ Fully Implemented | Default extractor with OCR support (OCRMac on macOS, EasyOCR on other platforms) |
+| **Azure DI**   | ⚠️ Placeholder       | Requires `AZURE_DI_KEY` environment variable when implemented                    |
+| **LlamaIndex** | ⚠️ Placeholder       | Requires `LLAMAPARSE_API_KEY` environment variable when implemented              |
+| **MinerU**     | ⚠️ Placeholder       | Will require magic-pdf library when implemented                                  |
 
 ## Configuration
 
@@ -223,11 +223,11 @@ Claude: "I'll split the documentation by endpoints...
 
 ## Performance
 
-| Extractor  | Speed          | Requirements | Status |
-| ---------- | -------------- | ------------ | ------ |
-| Azure DI   | 0.2-1 sec/page | API key      | Planned |
-| LlamaIndex | 1-2 sec/page   | API key      | Planned |
-| MinerU     | 3-7 sec/page   | Local, GPU   | Planned |
+| Extractor  | Speed          | Requirements | Status       |
+| ---------- | -------------- | ------------ | ------------ |
+| Azure DI   | 0.2-1 sec/page | API key      | Planned      |
+| LlamaIndex | 1-2 sec/page   | API key      | Planned      |
+| MinerU     | 3-7 sec/page   | Local, GPU   | Planned      |
 | Docling    | 5-10 sec/page  | Local, CPU   | ✅ Available |
 
 ## Privacy & Security
@@ -243,14 +243,14 @@ Claude: "I'll split the documentation by endpoints...
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/inkognito
+git clone https://github.com/phren0logy/inkognito
 cd inkognito
 
 # Run with FastMCP CLI
 fastmcp dev
 
-# Or run directly
-uv run inkognito
+# Or run directly in development
+uv run python server.py
 ```
 
 ### Testing with FastMCP
@@ -268,12 +268,21 @@ fastmcp test inkognito extract_document
 ```
 inkognito/
 ├── pyproject.toml          # FastMCP-compatible packaging
-├── src/
-│   └── inkognito/
-│       ├── __init__.py
-│       ├── __main__.py     # Entry point
-│       ├── server.py       # FastMCP server setup
-│       └── ...
+├── LICENSE                 # MIT license
+├── README.md               # This file
+├── server.py               # FastMCP server and entry point
+├── anonymizer.py           # PII detection and anonymization
+├── vault.py                # Vault management for reversibility
+├── segmenter.py            # Document segmentation
+├── exceptions.py           # Custom exceptions
+├── extractors/             # PDF extraction backends
+│   ├── __init__.py
+│   ├── base.py
+│   ├── registry.py
+│   ├── docling.py          # ✅ Implemented
+│   ├── azure_di.py         # Placeholder
+│   ├── llamaindex.py       # Placeholder
+│   └── mineru.py           # Placeholder
 └── tests/
 ```
 

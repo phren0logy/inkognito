@@ -2,7 +2,7 @@
 name = "inkognito"
 version = "0.1.0"
 description = "Privacy-first document processing FastMCP server with PII anonymization"
-authors = [{name = "Your Name", email = "your.email@example.com"}]
+authors = [{name = "Andrew Nanton", email = "git-nanton@stanford.edu"}]
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
