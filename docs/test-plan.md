@@ -15,6 +15,7 @@ tests/
 ├── test_vault.py               # Test vault serialization and restoration
 ├── test_segmenter.py           # Test document segmentation
 ├── test_exceptions.py          # Test custom exceptions
+├── test_fastmcp_client.py      # FastMCP Client integration tests (PRIMARY)
 ├── extractors/
 │   ├── __init__.py
 │   ├── test_base.py           # Test base extractor interface
@@ -26,7 +27,7 @@ tests/
 │   └── sample_with_pii.md     # Markdown with known PII
 └── integration/               # Integration tests
     ├── test_end_to_end.py     # Full workflow tests
-    └── test_fastmcp.py        # FastMCP integration tests
+    └── test_with_live_server.py # FastMCP live server tests
 ```
 
 ## Test Dependencies
@@ -166,6 +167,15 @@ test = [
 
 ### 3. Integration Tests
 
+#### test_fastmcp_client.py (PRIMARY TESTING APPROACH)
+- **Test using FastMCP's native Client class**
+  - Direct in-memory server connection with `Client(server)`
+  - No subprocess management needed
+  - Tests all tools through actual MCP protocol
+  - Verifies complete workflows: PDF → Extract → Anonymize → Restore
+  - Tests error handling, batch processing, and segmentation
+  - Access results via `result.data` (the actual ProcessingResult object)
+
 #### test_end_to_end.py
 - **Test complete workflows**
   - PDF → Anonymize → Restore cycle
@@ -173,7 +183,7 @@ test = [
   - Error propagation through pipeline
   - Large file handling
 
-#### test_fastmcp.py
+#### test_with_live_server.py
 - **Test FastMCP server integration**
   - Tool registration
   - Context injection via type hints
@@ -185,6 +195,16 @@ test = [
 
 ```python
 # Key fixtures to implement
+
+# PRIMARY: FastMCP Client fixture
+@pytest.fixture
+async def client():
+    """Create a FastMCP client connected to the server."""
+    from fastmcp import Client
+    from server import server
+    async with Client(server) as client:
+        yield client
+
 @pytest.fixture
 def sample_markdown():
     """Markdown content without PII."""
@@ -334,8 +354,11 @@ uv run pytest
 # Run with coverage
 uv run pytest --cov=. --cov-report=html
 
-# Run specific test file
-uv run pytest tests/test_server.py
+# Run FastMCP Client integration tests (RECOMMENDED)
+uv run pytest tests/test_fastmcp_client.py -v
+
+# Run specific test
+uv run pytest tests/test_fastmcp_client.py::TestFastMCPClient::test_anonymize_document -xvs
 
 # Run with verbose output
 uv run pytest -v
@@ -343,6 +366,37 @@ uv run pytest -v
 # Run only unit tests (exclude integration)
 uv run pytest tests/ --ignore=tests/integration/
 ```
+
+### FastMCP Client Testing (Primary Approach)
+
+The recommended way to test FastMCP servers is using the native `Client` class:
+
+```python
+from fastmcp import Client
+from server import server
+import pytest
+
+@pytest.mark.asyncio
+async def test_tool_workflow():
+    async with Client(server) as client:
+        # Call tools through the client
+        result = await client.call_tool(
+            "anonymize_documents",
+            {
+                "output_dir": "test_output",
+                "files": ["test.md"]
+            }
+        )
+        # Access the ProcessingResult object directly
+        assert result.data.success is True
+        assert len(result.data.output_paths) > 0
+```
+
+**Important Notes:**
+- `result.data` is the actual ProcessingResult object, not a dictionary
+- No subprocess management needed - FastMCP handles everything in-memory
+- All tests should be async and use `pytest.mark.asyncio`
+- This approach tests the actual MCP protocol implementation
 
 ### Coverage Goals
 - Overall coverage: >80%
@@ -396,6 +450,9 @@ jobs:
 5. Test behavior, not implementation
 6. Regular fixture cleanup
 7. Avoid testing FastMCP framework itself
+8. **Use FastMCP's Client class for integration tests - no custom MCP implementations**
+9. **Remember that `result.data` returns the actual object, not a dictionary**
+10. **All FastMCP client tests should be async**
 
 ### Test Organization
 - Group related tests in classes

@@ -167,43 +167,24 @@ class TestWithLiveServer:
 
 
 def run_server_command(tool_name: str, **params) -> Dict[str, Any]:
-    """Helper to run a FastMCP tool via subprocess."""
-    cmd = [
-        sys.executable, "-m", "fastmcp", "run", "server.py",
-        "--call", tool_name,
-        "--params", json.dumps(params)
-    ]
+    """Helper to run a FastMCP tool using MCP client."""
+    # Import here to avoid circular imports
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from mcp_client import MCPTestClient
     
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-            cwd=Path(__file__).parent.parent.parent  # Project root
-        )
+        # Create and start client
+        client = MCPTestClient()
+        client.start()
         
-        if result.returncode != 0:
-            return {
-                "success": False,
-                "message": f"Command failed: {result.stderr}"
-            }
+        # Call the tool
+        result = client.call_tool(tool_name, **params)
         
-        # Try to parse JSON output
-        try:
-            return json.loads(result.stdout)
-        except json.JSONDecodeError:
-            return {
-                "success": False,
-                "message": "Invalid JSON response",
-                "output": result.stdout
-            }
-    
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "message": "Command timed out"
-        }
+        # Stop the server
+        client.stop()
+        
+        return result
+        
     except Exception as e:
         return {
             "success": False,

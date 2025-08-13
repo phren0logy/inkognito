@@ -116,6 +116,53 @@ Note: The `[project.scripts]` entry point has been removed to follow FastMCP bes
    - `LLAMAPARSE_API_KEY` - For LlamaIndex extraction
    - `INKOGNITO_OCR_LANGUAGES` - Comma-separated list of OCR languages (e.g., "en,fr,de")
 
+## Testing FastMCP Servers
+
+FastMCP provides a native `Client` class for in-memory testing. **Do not use subprocess or custom MCP protocol implementations.**
+
+### Correct Testing Approach
+
+```python
+from fastmcp import Client
+from server import server
+import pytest
+
+@pytest.fixture
+async def client():
+    """Create a FastMCP client connected to the server."""
+    async with Client(server) as client:
+        yield client
+
+async def test_tool(client):
+    result = await client.call_tool("tool_name", {"param": "value"})
+    # result.data contains the ProcessingResult object
+    assert result.data.success is True
+```
+
+### Key Testing Patterns
+
+1. **Direct Server Connection**: Pass the server instance directly to `Client(server)`
+2. **No Subprocess Management**: FastMCP handles everything in-memory
+3. **Access Tool Results**: Use `result.data` to access the returned object (not a dict)
+4. **Async Testing**: All tests should be `async` and use `pytest.mark.asyncio`
+
+### Running Tests
+
+```bash
+# Run all FastMCP integration tests
+uv run pytest tests/test_fastmcp_client.py -v
+
+# Run a specific test
+uv run pytest tests/test_fastmcp_client.py::TestFastMCPClient::test_anonymize_document -xvs
+```
+
+### Common Testing Mistakes to Avoid
+
+- ❌ Don't spawn server processes with subprocess
+- ❌ Don't implement custom MCP protocol handling  
+- ❌ Don't use JSON-RPC directly
+- ❌ Don't treat `result.data` as a dictionary (it's the actual return object)
+
 ## Testing New Extractors
 
 When adding a new extractor:
@@ -130,3 +177,4 @@ When adding a new extractor:
 - Progress reporting requires FastMCP context - use the injected `ctx` parameter
 - Vault format requires a specific structure - don't modify serialization
 - Entity types must match LLM-Guard's expected values (e.g., "EMAIL_ADDRESS", not "email")
+- When testing, remember that `result.data` is the actual ProcessingResult object, not a dict
