@@ -863,6 +863,11 @@ Generated: {datetime.now().isoformat()}
         )
 
 
+def main():
+    """Main entry point for the inkognito FastMCP server."""
+    server.run()
+
+
 # Main entry point
 if __name__ == "__main__":
-    server.run()
+    main()

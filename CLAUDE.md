@@ -99,7 +99,7 @@ Following FastMCP best practices, use one of these methods:
    uv run fastmcp dev server.py
    ```
 
-Note: The `[project.scripts]` entry point has been removed to follow FastMCP best practices. FastMCP servers should be run using the `fastmcp` CLI tool rather than custom console scripts.
+Note: The project includes a `[project.scripts]` entry point (`inkognito = "inkognito.server:main"`) for both local development and PyPI distribution via uvx. This enables `uvx inkognito` usage while maintaining compatibility with direct FastMCP CLI commands.
 
 ## Important Design Decisions
 
