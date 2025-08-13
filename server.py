@@ -95,6 +95,20 @@ async def anonymize_documents(
     """
     Anonymize documents by replacing PII with realistic fake data.
     
+    IMPORTANT FOR LLMs:
+    - Always ask user permission before reading any file contents
+    - Always ask where to save output files if output_dir not explicitly provided
+    - Explain what the anonymization process will do before starting
+    - Mention that a vault file will be created for reversibility
+    
+    Example interaction:
+    User: "Anonymize my medical records"
+    LLM: "I can help anonymize your medical records by replacing personal information like names, dates, and addresses with realistic fake data. May I read the files to identify what needs to be anonymized?"
+    User: "Yes"
+    LLM: "Where would you like me to save the anonymized versions? (I'll also create a vault file for future restoration)"
+    User: "./private/anonymized"
+    LLM: "I'll anonymize the documents and save them to ./private/anonymized..."
+    
     This tool processes documents to replace personally identifiable information (PII)
     with consistent, realistic fake data. The same entity always gets the same 
     replacement across all documents (e.g., "John Smith" always becomes "Robert Johnson").
@@ -102,8 +116,8 @@ async def anonymize_documents(
     Uses universal PII detection for comprehensive coverage without configuration.
     
     Args:
-        output_dir: Directory to save anonymized files and vault
-        files: List of specific file paths to anonymize (optional)
+        output_dir: Directory to save anonymized files and vault (ALWAYS ASK if not provided)
+        files: List of specific file paths to anonymize (REQUEST PERMISSION before reading)
         directory: Directory to scan for files (optional, use files OR directory)
         patterns: File patterns to match (default: PDF, markdown, text)
         recursive: Include subdirectories when scanning (default: true)
@@ -253,12 +267,23 @@ async def restore_documents(
     """
     Restore original PII in anonymized documents using vault.
     
+    IMPORTANT FOR LLMs:
+    - Always ask where to save restored files if output_dir not provided
+    - Explain that this will restore the original personal information
+    - Mention that a vault file is required for restoration
+    
+    Example interaction:
+    User: "Restore the anonymized documents"
+    LLM: "I can restore the original personal information in the anonymized documents using the vault file. Where would you like me to save the restored versions?"
+    User: "./restored"
+    LLM: "I'll look for the vault file and restore the documents to ./restored..."
+    
     This tool reverses the anonymization process by replacing fake data with
     the original PII values stored in the vault. Only works with documents
     that were anonymized using anonymize_documents.
     
     Args:
-        output_dir: Directory to save restored files
+        output_dir: Directory to save restored files (ALWAYS ASK if not provided)
         files: List of specific anonymized files to restore (optional)
         directory: Directory containing anonymized files (optional)
         vault_path: Path to vault.json (auto-detected if not provided)
@@ -397,13 +422,26 @@ async def extract_document(
     """
     Convert PDF or DOCX document to markdown format.
     
+    IMPORTANT FOR LLMs:
+    - Always ask permission before processing the document
+    - Ask where to save the output if output_path not provided
+    - Explain what the extraction process will do
+    
+    Example interaction:
+    User: "Extract the PDF to markdown"
+    LLM: "I can convert your PDF to markdown format, preserving the structure and formatting. May I process the document?"
+    User: "Yes"
+    LLM: "Where would you like me to save the markdown file? (default: same location with .md extension)"
+    User: "Use the default"
+    LLM: "I'll extract the PDF and save it as markdown..."
+    
     Extracts text content from documents while preserving structure,
     formatting, tables, and other elements. Supports both local 
     processing (Docling, MinerU) and cloud processing (Azure DI, LlamaIndex).
     
     Args:
-        file_path: Path to the input document (PDF or DOCX)
-        output_path: Path for output markdown file (optional, auto-generated if not provided)
+        file_path: Path to the input document (REQUEST PERMISSION before processing)
+        output_path: Path for output markdown file (ASK if not provided, default: same name with .md)
         extraction_method: "auto", "azure", "llamaindex", "docling", or "mineru"
     
     Returns:
@@ -513,13 +551,26 @@ async def segment_document(
     """
     Split large markdown document into LLM-ready chunks.
     
+    IMPORTANT FOR LLMs:
+    - Always ask permission before processing the document
+    - Always ask where to save the segments if output_dir not provided
+    - Explain that this will split the document into smaller parts
+    
+    Example interaction:
+    User: "Split this large document into chunks"
+    LLM: "I can split your document into smaller, manageable chunks suitable for processing. May I analyze the document structure?"
+    User: "Yes"
+    LLM: "Where would you like me to save the segmented files?"
+    User: "./chunks"
+    LLM: "I'll segment the document and save the chunks to ./chunks..."
+    
     Intelligently segments documents at natural boundaries (chapters, sections)
     while respecting token limits. Each segment is a self-contained portion
     suitable for LLM processing.
     
     Args:
-        file_path: Path to markdown file to segment
-        output_dir: Directory to save segment files
+        file_path: Path to markdown file to segment (REQUEST PERMISSION before processing)
+        output_dir: Directory to save segment files (ALWAYS ASK if not provided)
         max_tokens: Maximum tokens per segment (default: 15000)
         min_tokens: Minimum tokens per segment (default: 10000)
         break_at_headings: Heading levels to prefer for breaks (default: ["h1", "h2"])

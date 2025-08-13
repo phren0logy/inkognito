@@ -32,10 +32,11 @@ Add to your `claude_desktop_config.json`:
       "command": "uvx",
       "args": ["inkognito"],
       "env": {
-        "AZURE_DI_KEY": "your-key-here",
-        "LLAMAPARSE_API_KEY": "your-key-here"
+        // Optional: Add keys when extractors are implemented
+        // "AZURE_DI_KEY": "your-key-here",
+        // "LLAMAPARSE_API_KEY": "your-key-here"
       }
-    }
+    },
     "filesystem": {
       "command": "npx",
       "args": [
@@ -79,10 +80,10 @@ In Claude Desktop:
 
 ### 📄 Multiple Extraction Options
 
-- **Local**: Docling (default), MinerU
-- **Cloud**: Azure DI, LlamaIndex
+- **Available Now**: Docling (default, with OCR support)
+- **Planned**: Azure DI, LlamaIndex, MinerU (placeholders only)
 - Auto-selects best available option
-- Fallback to local if cloud fails
+- Falls back to Docling if no cloud options
 
 ### ✂️ Intelligent Segmentation
 
@@ -113,7 +114,7 @@ Convert PDF/DOCX to markdown.
 ```python
 extract_document(
     file_path="/path/to/document.pdf",
-    extraction_method="auto"  # auto, azure, llamaindex, docling, mineru
+    extraction_method="auto"  # auto, docling (others coming soon)
 )
 ```
 
@@ -153,14 +154,26 @@ restore_documents(
 )
 ```
 
+## Extractor Status
+
+| Extractor | Status | Notes |
+|-----------|--------|-------|
+| **Docling** | ✅ Fully Implemented | Default extractor with OCR support (OCRMac on macOS, EasyOCR on other platforms) |
+| **Azure DI** | ⚠️ Placeholder | Requires `AZURE_DI_KEY` environment variable when implemented |
+| **LlamaIndex** | ⚠️ Placeholder | Requires `LLAMAPARSE_API_KEY` environment variable when implemented |
+| **MinerU** | ⚠️ Placeholder | Will require magic-pdf library when implemented |
+
 ## Configuration
 
 Following FastMCP conventions, all configuration is via environment variables:
 
 ```bash
-# Optional API keys for cloud extractors
+# Optional API keys for cloud extractors (when implemented)
 export AZURE_DI_KEY="your-key-here"
 export LLAMAPARSE_API_KEY="your-key-here"
+
+# Optional OCR languages (comma-separated, default: all available)
+export INKOGNITO_OCR_LANGUAGES="en,fr,de"
 ```
 
 ## Examples
@@ -186,9 +199,9 @@ You: "Extract this 300-page research PDF"
 
 Claude: "I'll extract that PDF to markdown...
 
-[Using Azure DI for fast extraction...]
+[Using Docling for extraction...]
 
-✓ Extracted 300 pages in 45 seconds
+✓ Extracted 300 pages
 ✓ Preserved: tables, figures, citations
 ✓ Output size: 487,000 tokens
 ✓ Saved to: research_paper.md
@@ -210,12 +223,12 @@ Claude: "I'll split the documentation by endpoints...
 
 ## Performance
 
-| Extractor  | Speed          | Requirements |
-| ---------- | -------------- | ------------ |
-| Azure DI   | 0.2-1 sec/page | API key      |
-| LlamaIndex | 1-2 sec/page   | API key      |
-| MinerU     | 3-7 sec/page   | Local, GPU   |
-| Docling    | 5-10 sec/page  | Local, CPU   |
+| Extractor  | Speed          | Requirements | Status |
+| ---------- | -------------- | ------------ | ------ |
+| Azure DI   | 0.2-1 sec/page | API key      | Planned |
+| LlamaIndex | 1-2 sec/page   | API key      | Planned |
+| MinerU     | 3-7 sec/page   | Local, GPU   | Planned |
+| Docling    | 5-10 sec/page  | Local, CPU   | ✅ Available |
 
 ## Privacy & Security
 
