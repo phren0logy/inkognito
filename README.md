@@ -2,7 +2,7 @@
 
 Privacy-first document processing FastMCP server. Extract, anonymize, and segment documents through FastMCP's modern tool interface.
 
-Please note: As an MCP, privacy of file contents cannot be absolutely guaranteed, but it is a central design consideration. While file _contents_ should be low risk (but non-zero) risk for leakage, file _names_ will unavoidably be read and written by the MCP. Plan accordingly.
+Please note: As an MCP, privacy of file contents cannot be absolutely guaranteed, but it is a central design consideration. While file _contents_ should be low risk (but non-zero) risk for leakage, file _names_ will, unavoidably and by design, be read and written by the MCP. Plan accordingly. Consider using a local model.
 
 ## Quick Start
 

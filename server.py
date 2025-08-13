@@ -87,43 +87,42 @@ async def anonymize_documents(
     files: Optional[List[str]] = None,
     directory: Optional[str] = None,
     patterns: List[str] = ["*.pdf", "*.md", "*.txt"],
-    recursive: bool = True,
-    entity_types: Optional[List[str]] = None,
-    score_threshold: float = 0.5,
-    date_shift_days: int = 365
+    recursive: bool = True
 ) -> ProcessingResult:
     """
-    Anonymize documents by replacing PII with realistic fake data.
+    Extract and anonymize documents by replacing PII with realistic fake data.
     
     IMPORTANT FOR LLMs:
     - Always ask user permission before reading any file contents
     - Always ask where to save output files if output_dir not explicitly provided
     - Explain what the anonymization process will do before starting
     - Mention that a vault file will be created for reversibility
+    - Note that PDFs will be converted to markdown before anonymization
     
     Example interaction:
-    User: "Anonymize my medical records"
-    LLM: "I can help anonymize your medical records by replacing personal information like names, dates, and addresses with realistic fake data. May I read the files to identify what needs to be anonymized?"
+    User: "Anonymize my contracts folder"
+    LLM: "I can help anonymize your contracts by replacing personal information like names, dates, and addresses with realistic fake data. PDFs will be converted to markdown format. May I read the files to identify what needs to be anonymized?"
     User: "Yes"
     LLM: "Where would you like me to save the anonymized versions? (I'll also create a vault file for future restoration)"
     User: "./private/anonymized"
     LLM: "I'll anonymize the documents and save them to ./private/anonymized..."
     
-    This tool processes documents to replace personally identifiable information (PII)
-    with consistent, realistic fake data. The same entity always gets the same 
-    replacement across all documents (e.g., "John Smith" always becomes "Robert Johnson").
+    This tool processes documents in two steps:
+    1. Extracts text from PDFs (converts to markdown) or reads markdown/text files directly
+    2. Replaces personally identifiable information (PII) with consistent, realistic fake data
     
-    Uses universal PII detection for comprehensive coverage without configuration.
+    The same entity always gets the same replacement across all documents 
+    (e.g., "John Smith" always becomes "Robert Johnson" in every file).
+    
+    Supported input formats: PDF, Markdown (.md), Text (.txt)
+    Output format: Always Markdown (.md) regardless of input
     
     Args:
         output_dir: Directory to save anonymized files and vault (ALWAYS ASK if not provided)
         files: List of specific file paths to anonymize (REQUEST PERMISSION before reading)
         directory: Directory to scan for files (optional, use files OR directory)
-        patterns: File patterns to match (default: PDF, markdown, text)
+        patterns: File patterns to match (default: ["*.pdf", "*.md", "*.txt"])
         recursive: Include subdirectories when scanning (default: true)
-        entity_types: Optional list of specific entity types to detect
-        score_threshold: Confidence threshold for PII detection (default: 0.5)
-        date_shift_days: Maximum days to shift dates (default: 365)
     
     Returns:
         ProcessingResult with output paths, statistics, and vault location
@@ -151,8 +150,8 @@ async def anonymize_documents(
         # Initialize anonymizer
         anonymizer = PIIAnonymizer()
         
-        # Generate date offset for this session
-        date_offset = anonymizer.generate_date_offset(date_shift_days)
+        # Generate date offset for this session (default 365 days)
+        date_offset = anonymizer.generate_date_offset(365)
         
         # Process each file
         total_statistics = {}
@@ -271,6 +270,7 @@ async def restore_documents(
     - Always ask where to save restored files if output_dir not provided
     - Explain that this will restore the original personal information
     - Mention that a vault file is required for restoration
+    - Explain vault auto-detection if user doesn't provide vault_path
     
     Example interaction:
     User: "Restore the anonymized documents"
@@ -280,13 +280,17 @@ async def restore_documents(
     
     This tool reverses the anonymization process by replacing fake data with
     the original PII values stored in the vault. Only works with documents
-    that were anonymized using anonymize_documents.
+    that were anonymized using the anonymize_documents tool.
+    
+    Vault auto-detection: If vault_path is not provided, the tool searches:
+    1. Parent directory of the anonymized files (most common location)
+    2. Same directory as the anonymized files
     
     Args:
         output_dir: Directory to save restored files (ALWAYS ASK if not provided)
         files: List of specific anonymized files to restore (optional)
         directory: Directory containing anonymized files (optional)
-        vault_path: Path to vault.json (auto-detected if not provided)
+        vault_path: Path to vault.json (if not provided, searches parent directory first, then current)
         patterns: File patterns to match (default: ["*.md"])
         recursive: Include subdirectories (default: true)
     
@@ -426,6 +430,7 @@ async def extract_document(
     - Always ask permission before processing the document
     - Ask where to save the output if output_path not provided
     - Explain what the extraction process will do
+    - Currently only Docling extractor is implemented
     
     Example interaction:
     User: "Extract the PDF to markdown"
@@ -436,13 +441,15 @@ async def extract_document(
     LLM: "I'll extract the PDF and save it as markdown..."
     
     Extracts text content from documents while preserving structure,
-    formatting, tables, and other elements. Supports both local 
-    processing (Docling, MinerU) and cloud processing (Azure DI, LlamaIndex).
+    formatting, tables, and other elements. Uses Docling for local processing
+    with OCR support (OCRMac on macOS, EasyOCR on other platforms).
+    
+    Supported file types: PDF, DOCX
     
     Args:
         file_path: Path to the input document (REQUEST PERMISSION before processing)
         output_path: Path for output markdown file (ASK if not provided, default: same name with .md)
-        extraction_method: "auto", "azure", "llamaindex", "docling", or "mineru"
+        extraction_method: "auto" (uses Docling) or "docling" (default: "auto")
     
     Returns:
         ProcessingResult with extracted markdown file path
@@ -555,18 +562,22 @@ async def segment_document(
     - Always ask permission before processing the document
     - Always ask where to save the segments if output_dir not provided
     - Explain that this will split the document into smaller parts
+    - Mention this is for documents that exceed LLM context limits
     
     Example interaction:
     User: "Split this large document into chunks"
-    LLM: "I can split your document into smaller, manageable chunks suitable for processing. May I analyze the document structure?"
+    LLM: "I can split your document into smaller, manageable chunks suitable for LLM processing. This is useful when documents exceed context limits. May I analyze the document structure?"
     User: "Yes"
     LLM: "Where would you like me to save the segmented files?"
     User: "./chunks"
     LLM: "I'll segment the document and save the chunks to ./chunks..."
     
-    Intelligently segments documents at natural boundaries (chapters, sections)
-    while respecting token limits. Each segment is a self-contained portion
-    suitable for LLM processing.
+    Use this tool when documents exceed LLM context limits or need batch processing.
+    Unlike split_into_prompts, this creates evenly-sized chunks optimized for token 
+    limits while preserving context across segments.
+    
+    Intelligently segments at natural boundaries (chapters, sections) and maintains
+    heading context so each segment knows its place in the document structure.
     
     Args:
         file_path: Path to markdown file to segment (REQUEST PERMISSION before processing)
@@ -712,15 +723,34 @@ async def split_into_prompts(
     prompt_template: Optional[str] = None
 ) -> ProcessingResult:
     """
-    Split structured markdown into individual prompts.
+    Split structured markdown into individual prompts by heading.
     
-    Splits markdown documents by heading level to create individual prompt files.
-    Perfect for converting documentation, guides, or structured content into
-    discrete prompts for AI training or testing.
+    IMPORTANT FOR LLMs:
+    - Always ask permission before processing the document
+    - Always ask where to save the prompts if output_dir not provided
+    - Explain this creates one file per heading section
+    - Mention this is ideal for structured content that needs individual processing
+    
+    Example interaction:
+    User: "Split this procedures manual into individual prompts"
+    LLM: "I can split your procedures manual into individual files, one for each section heading. This is perfect for creating training data or processing each procedure separately. May I analyze the document structure?"
+    User: "Yes"
+    LLM: "Where would you like me to save the individual prompt files?"
+    User: "./procedures"
+    LLM: "I'll split the manual by headings and save each procedure to ./procedures..."
+    
+    Creates one file per heading - ideal for report templates, instruction sets,
+    or documentation that needs individual processing. Unlike segment_document,
+    this splits strictly by heading structure regardless of size.
+    
+    Use cases:
+    - Converting a report template into individual section templates
+    - Splitting a procedures manual into individual procedures
+    - Breaking documentation into discrete topics for training
     
     Args:
         file_path: Path to markdown file with clear heading structure
-        output_dir: Directory to save prompt files
+        output_dir: Directory to save prompt files (ALWAYS ASK if not provided)
         split_level: Heading level to split at ("h1", "h2", "h3", etc.)
         include_parent_context: Include parent heading in context (default: true)
         prompt_template: Template with {heading}, {content}, {parent}, {level} placeholders
